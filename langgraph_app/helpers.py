@@ -12,7 +12,7 @@ from conversation.policy import (
     difficulty_profile,
     extract_preferred_strategies,
 )
-from conversation.schemas import ConversationGoal
+from conversation.schemas import ConversationGoal, SessionConfig
 
 from .state import ConversationState
 
@@ -150,20 +150,62 @@ def detect_wrong_drug(message: str, drug_intro_keywords: List[str]) -> bool:
 # Budowanie stanu początkowego
 # ---------------------------------------------------------------------------
 
-def build_initial_state(doctor_profile: Dict, drug_info: Dict, session_id: str) -> ConversationState:
-    """Tworzy pełny stan początkowy sesji."""
+def build_initial_state(
+    doctor_profile: Dict,
+    drug_info: Dict,
+    session_id: str,
+    session_config: Optional[SessionConfig] = None,
+) -> ConversationState:
+    """Tworzy pełny stan początkowy sesji.
+
+    Parametry:
+        doctor_profile: profil lekarza z doctor_archetypes.json
+        drug_info: dane leku
+        session_id: UUID sesji
+        session_config: opcjonalna konfiguracja sesji (familiarity, register, warmth, itp.)
+            Brak = wartości domyślne (FIRST_MEETING, PROFESSIONAL, NEUTRAL).
+            Zachowuje pełną kompatybilność wsteczną ze starszymi klientami API,
+            którzy wołają /start bez body.
+    """
     initial_traits = clamp_traits(doctor_profile.get("traits", {}))
     preferred_strategies = extract_preferred_strategies(doctor_profile)
     difficulty_cfg = difficulty_profile(doctor_profile.get("difficulty", "medium"))
     claim_catalog = build_claim_catalog(drug_info)
     max_turns = derive_turn_limit(initial_traits, difficulty_cfg)
 
+    # Domyślna konfiguracja gdy klient nie przekazał body
+    if session_config is None:
+        session_config = SessionConfig()
+
+    # Inicjalizacja conviction (Etap 2)
+    # trust_in_rep zależy od familiarity; interest_level od openness lekarza
+    _trust_start = {"first_meeting": 0.20, "acquainted": 0.45, "familiar": 0.65}.get(
+        session_config.familiarity.value, 0.30
+    )
+    _openness = float(initial_traits.get("openness", 0.5))
+    initial_conviction: Dict[str, float] = {
+        "interest_level": round(max(0.10, min(0.50, 0.20 + _openness * 0.15)), 2),
+        "trust_in_rep": _trust_start,
+        "clinical_confidence": 0.2,
+        "perceived_fit": 0.2,
+        "decision_readiness": 0.0,
+    }
+
     return ConversationState(
         messages=[],
         session_id=session_id,
         doctor_profile=doctor_profile,
         drug_info=drug_info,
+        # Konfiguracja sesji (Etap 1)
+        familiarity=session_config.familiarity.value,
+        register=session_config.register.value,
+        warmth=session_config.warmth.value,
+        rep_name=session_config.rep_name,
+        rep_company=session_config.rep_company,
+        prior_visits_summary=session_config.prior_visits_summary,
+        # Pozostałe pola
         traits=initial_traits,
+        conviction=initial_conviction,
         turn_index=0,
         max_turns=max_turns,
         phase="opening",
@@ -346,6 +388,35 @@ def evaluate_conversation_goal(state: ConversationState, turn_metrics: Dict, cla
         reasons=list(dict.fromkeys(reasons))[:5],
         missing=list(dict.fromkeys(missing))[:6],
     ).model_dump()
+
+
+def derive_decision_from_conviction(conviction: Dict[str, float], state: ConversationState) -> str:
+    """Wyznacza decyzję lekarza na podstawie 5-wymiarowego stanu przekonań."""
+    trust = float(conviction.get("trust_in_rep", 0.3))
+    interest = float(conviction.get("interest_level", 0.3))
+    clinical = float(conviction.get("clinical_confidence", 0.2))
+    fit = float(conviction.get("perceived_fit", 0.2))
+    readiness = float(conviction.get("decision_readiness", 0.0))
+
+    # Hard reject — brak zaufania
+    if trust < 0.25:
+        return "reject"
+
+    avg_positive = (interest + trust + clinical + fit) / 4
+
+    # Rekomendacja innemu lekarzowi (wysoki trust + dobra znajomość kliniczna)
+    if trust >= 0.75 and clinical >= 0.70 and readiness >= 0.65:
+        return "recommend"
+
+    # Pełna decyzja o przepisaniu
+    if avg_positive >= 0.65 and readiness >= 0.75:
+        return "will_prescribe"
+
+    # Próbne zastosowanie
+    if avg_positive >= 0.55 and readiness >= 0.60:
+        return "trial_use"
+
+    return "undecided"
 
 
 def forced_goal_payload(state: ConversationState, doctor_decision: str, reason: str) -> Dict:

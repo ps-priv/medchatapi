@@ -3,14 +3,14 @@
 import json
 import logging
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import HTTPException
 
 from conversation.constants import CHAT_COMMANDS
 from conversation.data import get_doctor_by_id, get_drug_by_id
 from conversation.policy import clamp_traits
-from conversation.schemas import EvaluationResult, MessageRequest
+from conversation.schemas import EvaluationResult, MessageRequest, SessionConfig
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
@@ -45,8 +45,22 @@ def _load_drug(drug_id: str, api_key: str) -> Dict:
     return drug_info  # type: ignore[return-value]
 
 
-def start_session(doctor_id: str, drug_id: str, api_key: str = "") -> Dict:
-    """Inicjalizuje sesję i zwraca odpowiedź dla endpointu /start."""
+def start_session(
+    doctor_id: str,
+    drug_id: str,
+    api_key: str = "",
+    session_config: Optional[SessionConfig] = None,
+) -> Dict:
+    """Inicjalizuje sesję i zwraca odpowiedź dla endpointu /start.
+
+    Parametry:
+        doctor_id: ID archetypu lekarza
+        drug_id: ID leku
+        api_key: klucz OpenAI (dla RAG)
+        session_config: opcjonalna konfiguracja sesji (familiarity, register, warmth, itp.).
+            Brak (None) = wartości domyślne, zachowuje 100% kompatybilności wstecznej
+            ze starszymi klientami API wywołującymi /start bez body.
+    """
     doctor_profile = get_doctor_by_id(doctor_id)
     if not doctor_profile:
         raise HTTPException(status_code=404, detail=f"Nie znaleziono lekarza o id: {doctor_id}")
@@ -60,15 +74,27 @@ def start_session(doctor_id: str, drug_id: str, api_key: str = "") -> Dict:
         doctor_profile=doctor_profile,
         drug_info=drug_info,
         session_id=session_id,
+        session_config=session_config,
     )
     sessions[session_id] = state
 
-    logger.info("start_session id=%s doctor=%s drug=%s", session_id, doctor_id, drug_id)
-    return {
+    # Logujemy konfigurację - przyda się przy debugowaniu różnych scenariuszy treningowych
+    logger.info(
+        "start_session id=%s doctor=%s drug=%s familiarity=%s register=%s warmth=%s",
+        session_id, doctor_id, drug_id,
+        state.get("familiarity"), state.get("register"), state.get("warmth"),
+    )
+
+    response: Dict = {
         "session_id": session_id,
         "status": "Rozmowa rozpoczęta. Lekarz gotowy i czeka na cel wizyty.",
         "traits": state["traits"],
     }
+    # session_config jest opcjonalne w odpowiedzi - dodajemy tylko gdy klient go podał,
+    # żeby starsi klienci dostawali odpowiedź dokładnie taką jak wcześniej.
+    if session_config is not None:
+        response["session_config"] = session_config.model_dump(mode="json")
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +190,7 @@ def process_message(req: MessageRequest, api_key: str, model: str) -> Dict:
         "conversation_goal": result_state.get("current_conversation_goal", {}),
         "is_terminated": bool(result_state.get("current_is_terminated", False)),
         "termination_reason": result_state.get("current_termination_reason"),
+        "conviction": result_state.get("conviction"),
     }
 
 

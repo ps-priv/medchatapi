@@ -1,6 +1,121 @@
+from enum import Enum
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+# ---------------------------------------------------------------------------
+# Konfiguracja sesji rozmowy (opcjonalna, dodana w Etapie 1)
+# ---------------------------------------------------------------------------
+
+
+class Familiarity(str, Enum):
+    """Poziom znajomości między lekarzem a przedstawicielem."""
+
+    FIRST_MEETING = "first_meeting"   # pierwsza wizyta, lekarz nie zna rozmówcy
+    ACQUAINTED = "acquainted"         # znają się z poprzednich wizyt (relacja zawodowa)
+    FAMILIAR = "familiar"             # dobrze się znają, swobodna relacja
+
+
+class CommunicationRegister(str, Enum):
+    """Rejestr (formalność) komunikacji."""
+
+    FORMAL = "formal"                 # bardzo oficjalny, sztywny
+    PROFESSIONAL = "professional"     # Pan/Pani z ciepłem (domyślne polskie biznesowe)
+    INFORMAL = "informal"             # na "ty" - dopuszczalne tylko przy FAMILIAR
+
+
+class CommunicationWarmth(str, Enum):
+    """Wymiar ciepła komunikacji (niezależny od rejestru)."""
+
+    COOL = "cool"                     # rzeczowy dystans
+    NEUTRAL = "neutral"               # zawodowo, bez ekstra ciepła
+    WARM = "warm"                     # serdeczny, ciepły ton
+
+
+class SessionConfig(BaseModel):
+    """Opcjonalna konfiguracja sesji przekazywana w body POST /start.
+
+    Brak konfiguracji = wartości domyślne (pełna kompatybilność wsteczna ze starszymi
+    klientami, którzy wołają /start bez body).
+    """
+
+    familiarity: Familiarity = Field(
+        default=Familiarity.FIRST_MEETING,
+        description="Poziom znajomości lekarza z przedstawicielem przed rozmową.",
+    )
+    register: CommunicationRegister = Field(
+        default=CommunicationRegister.PROFESSIONAL,
+        description="Formalność komunikacji. INFORMAL dopuszczalny tylko z FAMILIAR.",
+    )
+    warmth: CommunicationWarmth = Field(
+        default=CommunicationWarmth.NEUTRAL,
+        description="Ciepło komunikacji - niezależne od rejestru.",
+    )
+    rep_name: Optional[str] = Field(
+        default=None,
+        description="Imię/imię i nazwisko przedstawiciela. Wymagane przy familiarity != first_meeting.",
+    )
+    rep_company: Optional[str] = Field(
+        default=None,
+        description="Firma reprezentowana przez przedstawiciela.",
+    )
+    prior_visits_summary: Optional[str] = Field(
+        default=None,
+        description=(
+            "Krótki opis poprzednich wizyt/relacji. Używane tylko przy "
+            "familiarity in {acquainted, familiar}. Max 500 znaków."
+        ),
+        max_length=500,
+    )
+
+    @model_validator(mode="after")
+    def validate_consistency(self) -> "SessionConfig":
+        # Reguła 1: INFORMAL wymaga FAMILIAR
+        if (
+            self.register == CommunicationRegister.INFORMAL
+            and self.familiarity != Familiarity.FAMILIAR
+        ):
+            raise ValueError(
+                "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
+                "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
+                "lekarz oczekuje formy 'Pan/Pani'."
+            )
+        # Reguła 2: prior_visits_summary tylko gdy się znają
+        if (
+            self.prior_visits_summary
+            and self.familiarity == Familiarity.FIRST_MEETING
+        ):
+            raise ValueError(
+                "prior_visits_summary nie ma sensu przy first_meeting "
+                "(lekarz nie pamięta wcześniejszych wizyt z tym przedstawicielem)."
+            )
+        # Reguła 3: rep_name dla relacji ciągłej (ostrzeżenie miękkie - dopuszczamy brak, ale logujemy)
+        # Nie raise - tylko walidator może to zalogować, jeśli zostanie pusty
+        return self
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "familiarity": "acquainted",
+                "register": "professional",
+                "warmth": "warm",
+                "rep_name": "Anna Kowalska",
+                "rep_company": "PharmaCo",
+                "prior_visits_summary": "Trzecia wizyta. Poprzednio omawiali profil bezpieczeństwa leku u pacjentów >65 r.ż.",
+            }
+        }
+    )
+
+
+class DoctorConviction(BaseModel):
+    """5-wymiarowy stan przekonań lekarza wobec leku i przedstawiciela (Etap 2)."""
+
+    interest_level: float = Field(default=0.3, ge=0.0, le=1.0, description="Zainteresowanie tematem (0-1).")
+    trust_in_rep: float = Field(default=0.3, ge=0.0, le=1.0, description="Zaufanie do przedstawiciela (0-1).")
+    clinical_confidence: float = Field(default=0.2, ge=0.0, le=1.0, description="Zrozumienie i pewność co do leku (0-1).")
+    perceived_fit: float = Field(default=0.2, ge=0.0, le=1.0, description="Dopasowanie leku do swoich pacjentów (0-1).")
+    decision_readiness: float = Field(default=0.0, ge=0.0, le=1.0, description="Gotowość do podjęcia decyzji (0-1).")
 
 
 class TraitsUpdate(BaseModel):
@@ -130,6 +245,13 @@ class StartConversationResponse(BaseModel):
     session_id: str = Field(description="Identyfikator sesji rozmowy.")
     status: str = Field(description="Status uruchomienia sesji.")
     traits: TraitsUpdate = Field(description="Poczatkowe cechy psychologiczne lekarza.")
+    session_config: Optional[SessionConfig] = Field(
+        default=None,
+        description=(
+            "Konfiguracja sesji zastosowana do rozmowy. Pole opcjonalne dla "
+            "zachowania pełnej kompatybilności wstecznej ze starszymi klientami."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -175,6 +297,10 @@ class MessageSuccessResponse(BaseModel):
     termination_reason: Optional[str] = Field(
         default=None,
         description="Powod zakonczenia rozmowy, jesli is_terminated=true.",
+    )
+    conviction: Optional[DoctorConviction] = Field(
+        default=None,
+        description="Aktualny stan przekonań lekarza po tej turze (opcjonalne, dla nowych klientów API).",
     )
 
     model_config = ConfigDict(

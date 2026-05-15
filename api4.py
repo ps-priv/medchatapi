@@ -1,11 +1,12 @@
 """API v4 — symulacja rozmowy lekarz-przedstawiciel oparta na LangGraph."""
 
 import os
-from typing import Union
+from typing import Optional, Union
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
+from pydantic import ValidationError
 
 from conversation.schemas import (
     ConversationGoal,
@@ -18,6 +19,7 @@ from conversation.schemas import (
     MessageSuccessResponse,
     RateConversationRequest,
     RateConversationResponse,
+    SessionConfig,
     StartConversationResponse,
     TraitsUpdate,
     TranscribeRequest,
@@ -75,11 +77,56 @@ app.add_middleware(
     summary="Start nowej sesji rozmowy",
 )
 async def start_conversation(
+    request: Request,
     doctor_id: str = Query(..., alias="id", description="ID archetypu lekarza"),
     drug_id: str = Query(..., description="ID leku"),
 ):
-    """Tworzy nową sesję rozmowy."""
-    return start_session(doctor_id=doctor_id, drug_id=drug_id, api_key=OPENAI_API_KEY)
+    """Tworzy nową sesję rozmowy.
+
+    Body jest opcjonalne — dla pełnej kompatybilności wstecznej.
+
+    Wywołania bez body (lub z pustym body) działają identycznie jak wcześniej:
+    rozmowa startuje z domyślną konfiguracją (first_meeting, professional, neutral).
+
+    Wywołania z body (SessionConfig) pozwalają określić:
+    - familiarity: poziom znajomości (first_meeting/acquainted/familiar)
+    - register: formalność (formal/professional/informal)
+    - warmth: ciepło komunikacji (cool/neutral/warm)
+    - rep_name, rep_company, prior_visits_summary
+    """
+    # Ręczne czytanie body — żeby obsłużyć wszystkie przypadki:
+    # brak body, pusty body, body z JSON, JSON z null, JSON z konfiguracją.
+    session_config: Optional[SessionConfig] = None
+    raw_body = await request.body()
+    if raw_body:
+        import json as _json
+        try:
+            data = _json.loads(raw_body)
+        except _json.JSONDecodeError:
+            # Niepoprawny JSON - kompatybilność wsteczna: traktujemy jak brak body.
+            # (Dawniej taki request też nie miał body, więc nie psujemy klientów.)
+            data = None
+        if data:
+            # Walidacja Pydantic - rzuca ValidationError jeśli niezgodne z SessionConfig.
+            # FastAPI automatycznie zamieni to na HTTP 422 z komunikatem walidacji,
+            # co jest pożądane: klient dostaje czytelny błąd zamiast cichej akceptacji.
+            try:
+                session_config = SessionConfig.model_validate(data)
+            except ValidationError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "message": "Niepoprawna konfiguracja sesji.",
+                        "errors": exc.errors(),
+                    },
+                ) from exc
+
+    return start_session(
+        doctor_id=doctor_id,
+        drug_id=drug_id,
+        api_key=OPENAI_API_KEY,
+        session_config=session_config,
+    )
 
 
 @app.post(

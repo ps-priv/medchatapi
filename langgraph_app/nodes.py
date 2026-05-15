@@ -25,6 +25,7 @@ from conversation.policy import (
     evidence_first_requirements,
     policy_postprocess_message,
     policy_precheck,
+    update_conviction,
 )
 from conversation.schemas import DoctorResponse
 
@@ -33,6 +34,7 @@ from .helpers import (
     apply_random_event,
     build_turn_metrics_payload,
     check_termination,
+    derive_decision_from_conviction,
     detect_conversation_intent,
     detect_drug_introduction,
     detect_wrong_drug,
@@ -497,6 +499,25 @@ def _build_system_prompt(state: ConversationState) -> str:
 14. Własną wiedzę o leku przytaczaj wyłącznie jako zasłyszaną opinię (np. "Słyszałam od koleżanki, że..."). Nigdy jako potwierdzone fakty.
 15. Nigdy nie przedstawiaj się słowami "Jestem pani doktor". Reaguj naturalnie."""
 
+    # --- Sekcja conviction — pokazuje lekarzowi jego wewnętrzny stan (Etap 2) ---
+    conviction = state.get("conviction", {})
+    conviction_section = ""
+    if intent_revealed and conviction:
+        il = float(conviction.get("interest_level", 0.3))
+        tr = float(conviction.get("trust_in_rep", 0.3))
+        cc = float(conviction.get("clinical_confidence", 0.2))
+        pf = float(conviction.get("perceived_fit", 0.2))
+        dr = float(conviction.get("decision_readiness", 0.0))
+        conviction_section = f"""
+Twój wewnętrzny stan przekonań co do tej rozmowy (0.0 = brak, 1.0 = pełna pewność):
+- Zainteresowanie tematem: {il:.2f}
+- Zaufanie do rozmówcy: {tr:.2f}
+- Zrozumienie leku: {cc:.2f}
+- Dopasowanie do moich pacjentów: {pf:.2f}
+- Gotowość do decyzji: {dr:.2f}
+Wskazówka: jeśli średnia pierwszych czterech >= 0.65 i gotowość >= 0.75 — możesz rozważyć przepisanie. Jeśli zaufanie < 0.25 — odrzucasz propozycję.
+"""
+
     return f"""Jesteś lekarzem. Profil: {doctor.get('name', '')} ({doctor.get('description', '')})
 Kontekst sytuacyjny: {doctor.get('context_str', doctor.get('description', ''))}
 Płeć lekarza: {message_analysis.get('doctor_gender', 'female')}. Oczekiwana forma zwracania się: {message_analysis.get('expected_address', 'pani doktor')}.
@@ -511,7 +532,7 @@ Budżet rozmowy: maksymalnie {state.get('max_turns', 10)} tur, pozostało {style
 Frustracja lekarza (0-10): {state.get('frustration_score', 0.0)}
 Zdarzenie losowe tej tury: {random_event_line}
 {visitor_context}
-{drug_section}{rag_section}{claim_section}
+{drug_section}{rag_section}{claim_section}{conviction_section}
 Wykryte sygnały w ostatniej wypowiedzi:
 {json.dumps(message_analysis, ensure_ascii=False)}
 Metryki tej tury:
@@ -655,12 +676,27 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     elif float(state.get("frustration_score", 0.0)) >= 6.0:
         final_attitude = "serious"
 
-    # --- Decyzja lekarza ---
+    # --- Decyzja lekarza (inferencja z LLM jako fallback dla loggera) ---
     ai_decision = normalize_doctor_decision(getattr(ai_response, "doctor_decision", "undecided"))
     if ai_decision == "undecided":
         ai_decision = infer_decision_from_message(doctor_message)
 
-    # --- Ocena celu rozmowy ---
+    # --- Aktualizacja conviction (Etap 2) ---
+    new_conviction = update_conviction(
+        conviction=dict(state.get("conviction", {})),
+        claim_check=claim_check,
+        turn_metrics=turn_metrics,
+        message_analysis=message_analysis,
+        familiarity=str(state.get("familiarity", "first_meeting")),
+        frustration_score=float(state.get("frustration_score", 0.0)),
+        doctor_traits=dict(state.get("traits", {})),
+        preferred_strategies=list(state.get("preferred_strategies", [])),
+    )
+
+    # --- Decyzja z conviction (Etap 2) — zastępuje evaluate_conversation_goal jako źródło decyzji ---
+    conviction_decision = derive_decision_from_conviction(new_conviction, state)
+
+    # --- Ocena celu rozmowy (LOGGER — zostaje dla raportu końcowego, nie steruje decyzją) ---
     conversation_goal = evaluate_conversation_goal(
         state=state,
         turn_metrics=turn_metrics,
@@ -670,6 +706,8 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         doctor_decision=ai_decision,
         doctor_attitude=final_attitude,
     )
+    # Podmień doctor_decision w goal na conviction_decision (spójność danych w raporcie)
+    conversation_goal["doctor_decision"] = conviction_decision
 
     # --- Aktualizacja traits ---
     llm_traits = ai_response.updated_traits.model_dump() if ai_response else dict(state.get("traits", {}))
@@ -705,6 +743,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     return {
         "messages": new_messages,
         "traits": updated_traits,
+        "conviction": new_conviction,
         "is_terminated": is_terminated,
         "phase": "close" if is_terminated else state.get("phase", "opening"),
         "critical_flags": flags,
@@ -715,7 +754,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         "goal_achieved_turn": goal_achieved_turn,
         "current_doctor_response": doctor_message,
         "current_doctor_attitude": final_attitude,
-        "current_doctor_decision": conversation_goal["doctor_decision"],
+        "current_doctor_decision": conviction_decision,
         "current_reasoning": reasoning,
         "current_detected_errors": final_errors,
         "current_is_terminated": is_terminated,

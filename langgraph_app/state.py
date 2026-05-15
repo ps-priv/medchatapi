@@ -19,8 +19,22 @@ class ConversationState(TypedDict, total=False):
     doctor_profile: Dict[str, Any]
     drug_info: Dict[str, Any]
 
+    # Konfiguracja sesji (dodana w Etapie 1)
+    # Wartości pochodzą z opcjonalnego body SessionConfig w POST /start.
+    # Gdy klient nie poda body - używane są wartości domyślne (first_meeting, professional, neutral),
+    # co zapewnia pełną kompatybilność wsteczną.
+    familiarity: str               # "first_meeting" | "acquainted" | "familiar"
+    register: str                  # "formal" | "professional" | "informal"
+    warmth: str                    # "cool" | "neutral" | "warm"
+    rep_name: Optional[str]        # imię przedstawiciela (jeśli podane)
+    rep_company: Optional[str]     # firma przedstawiciela
+    prior_visits_summary: Optional[str]  # opis poprzednich wizyt (tylko przy acquainted/familiar)
+
     # Cechy psychologiczne lekarza (ewoluują)
     traits: Dict[str, float]
+
+    # 5-wymiarowy stan przekonań lekarza (Etap 2)
+    conviction: Dict[str, float]
 
     # Postęp rozmowy
     turn_index: int
