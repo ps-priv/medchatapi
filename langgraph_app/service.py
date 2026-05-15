@@ -17,8 +17,8 @@ from langchain_openai import ChatOpenAI
 
 from .agenda_generator import generate_agenda
 from .graph import compiled_graph
-from .helpers import build_initial_state, forced_goal_payload
 from .rag import get_rag
+from .session_builder import build_initial_state, forced_goal_payload
 from .state import ConversationState
 from .supabase_service import SupabaseService
 

@@ -1,6 +1,5 @@
 """Węzły grafu LangGraph — każdy realizuje jeden etap przetwarzania tury."""
 
-import json
 import logging
 from typing import Dict
 
@@ -14,36 +13,35 @@ from conversation.claims import (
     extract_drug_keywords,
     update_claim_coverage,
 )
-from conversation.constants import PHASE_OBJECTIVES
+from conversation.conviction import update_conviction
+from conversation.doctor_traits import build_style_directives, clamp_traits, difficulty_profile
+from conversation.message_analysis import analyze_message
+from conversation.metrics import advance_phase, compute_frustration, compute_turn_metrics
 from conversation.policy import (
-    advance_phase,
     apply_reaction_rules,
-    build_style_directives,
-    clamp_traits,
-    compute_frustration,
-    compute_turn_metrics,
     evidence_first_requirements,
     policy_postprocess_message,
     policy_precheck,
-    update_conviction,
 )
 from conversation.schemas import DoctorResponse
 
 from .helpers import (
-    apply_knowledge_guard,
-    apply_random_event,
     build_turn_metrics_payload,
     check_termination,
-    derive_decision_from_conviction,
     detect_conversation_intent,
     detect_drug_introduction,
     detect_wrong_drug,
+)
+from .knowledge_guard import apply_knowledge_guard
+from .prompt_builder import _build_system_prompt
+from .random_events import apply_random_event
+from .session_builder import (
     evaluate_conversation_goal,
     forced_goal_payload,
     infer_decision_from_message,
     normalize_doctor_decision,
-    plan_turn_mode,
 )
+from .turn_planner import derive_decision_from_conviction, plan_turn_mode
 from .state import ConversationState
 
 logger = logging.getLogger(__name__)
@@ -83,7 +81,7 @@ def node_detect_context(state: ConversationState) -> Dict:
             updates.setdefault("intent_revealed_turn", state.get("turn_index", 0))
             updates["drug_revealed"] = True
             updates["drug_revealed_turn"] = state.get("turn_index", 0)
-            updates["wrong_drug_suspected"] = False  # właściwy lek — resetuj flagę
+            updates["wrong_drug_suspected"] = False
             logger.debug("drug_revealed hits=%s", intro_hits[:3])
         elif not state.get("wrong_drug_suspected", False):
             if detect_wrong_drug(message, state.get("drug_intro_keywords", [])):
@@ -105,7 +103,6 @@ def node_analyze(state: ConversationState) -> Dict:
     drug_revealed = bool(state.get("drug_revealed", False))
     focus_keywords = extract_drug_keywords(drug_info) if drug_revealed else set(state.get("drug_intro_keywords", []))
 
-    from conversation.policy import analyze_message
     message_analysis = analyze_message(
         message=message,
         drug_info=drug_info,
@@ -164,7 +161,6 @@ def node_ethics_stop(state: ConversationState) -> Dict:
         doctor_decision="reject",
         reason="Nie osiągnięto celu: naruszenie etyki zakończyło rozmowę.",
     )
-    turn_index = int(state.get("turn_index", 0))
     new_messages = list(state.get("messages", []))
     new_messages.append({"role": "user", "content": str(state.get("current_user_message", ""))})
     new_messages.append({"role": "assistant", "content": forced_message})
@@ -201,7 +197,6 @@ def node_update_state(state: ConversationState) -> Dict:
     message_analysis = state.get("current_analysis", {})
     claim_check = state.get("current_claim_check", {})
 
-    from conversation.policy import difficulty_profile
     difficulty_cfg = difficulty_profile(state.get("difficulty", "medium"))
     preferred_strategies = state.get("preferred_strategies", [])
 
@@ -234,7 +229,6 @@ def node_update_state(state: ConversationState) -> Dict:
     history = list(state.get("turn_metrics_history", []))
     history.append(turn_log)
 
-    # Zastosuj zdarzenia losowe
     random_updates = apply_random_event({**state, "frustration_score": new_frustration, "phase": phase_update["phase"]})
 
     final_frustration = random_updates.get("frustration_score", new_frustration)
@@ -309,7 +303,6 @@ def node_time_stop(state: ConversationState) -> Dict:
 
 def node_build_directives(state: ConversationState) -> Dict:
     message_analysis = state.get("current_analysis", {})
-    claim_check = state.get("current_claim_check", {})
     coverage_update = state.get("current_coverage_update", {})
     evidence_reqs = state.get("current_evidence_requirements", {})
     random_event = state.get("current_random_event")
@@ -326,12 +319,10 @@ def node_build_directives(state: ConversationState) -> Dict:
     wrong_drug = bool(state.get("wrong_drug_suspected", False))
     missing_labels = coverage_update.get("missing_critical_labels", [])
 
-    # Dyrektywy stylu i policy — bez modyfikacji
     directives = []
     directives.extend(style_runtime["directives"])
     directives.extend(pre_policy.get("directives", []))
 
-    # Dyrektywa kontekstu wizyty — tylko jedna, priorytetyzowana
     if wrong_drug and not drug_revealed:
         directives.append(
             "WAŻNE: Rozmówca mówi o leku spoza obszaru Twoich zainteresowań. "
@@ -342,13 +333,11 @@ def node_build_directives(state: ConversationState) -> Dict:
     elif not drug_revealed:
         directives.append("Rozmówca ujawnił cel medyczny, ale nie podał tematu. Poproś o jeden konkret.")
 
-    # Zdarzenie losowe
     if random_event:
         event_directive = str(random_event.get("directive", "")).strip()
         if event_directive:
             directives.append(event_directive)
 
-    # Reakcje na jakość wypowiedzi — łączone w jedną dyrektywę gdy kilka naraz
     quality_issues = []
     if message_analysis.get("off_topic_hits") and not message_analysis.get("has_drug_focus"):
         quality_issues.append("rozmowa zbacza z tematu")
@@ -359,12 +348,10 @@ def node_build_directives(state: ConversationState) -> Dict:
     if quality_issues:
         directives.append(f"Wykryto: {', '.join(quality_issues)}. Zareaguj krótko i wróć do tematu.")
 
-    # Pytanie o brakujące claimy — jako ostatnia dyrektywa, tylko gdy drug revealed
     if missing_labels and drug_revealed:
         first_missing = missing_labels[0]
         directives.append(f"Zadaj jedno pytanie o brakujący temat: {first_missing}.")
 
-    # Dyrektywa evidence-first — tylko gdy nie ma już pytania kontekstowego
     if not wrong_drug and intent_revealed:
         directives.extend(evidence_reqs.get("directives", []))
 
@@ -417,212 +404,6 @@ def node_retrieve_context(state: ConversationState, config: RunnableConfig) -> D
 # Węzeł 7: wywołanie LLM — generowanie odpowiedzi lekarza
 # ---------------------------------------------------------------------------
 
-def _rag_section(state: ConversationState) -> str:
-    """Buduje sekcję RAG dla system promptu jeśli są dostępne fragmenty ChPL."""
-    chunks = state.get("current_rag_context", [])
-    if not chunks:
-        return ""
-    joined = "\n---\n".join(chunks)
-    return f"""
-Poniżej fragmenty oficjalnej dokumentacji leku (ChPL) relevantne do bieżącej wypowiedzi.
-Użyj ich jako wiedzy bazowej przy ocenie twierdzeń przedstawiciela — ale TYLKO w trybie zasłyszanej opinii:
-{joined}
-"""
-
-
-def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
-    """Buduje prompt systemowy lekarza — 3 sekcje: KIM JESTEŚ / CO ROBISZ / BEZPIECZNIKI."""
-    doctor = state.get("doctor_profile", {})
-    traits = state.get("traits", {})
-    message_analysis = state.get("current_analysis", {})
-    claim_check = state.get("current_claim_check", {})
-    coverage_summary = state.get("current_coverage_summary", {})
-    style_runtime = state.get("current_style_runtime", {})
-    behavior_directives = state.get("current_behavior_directives", [])
-    random_event = state.get("current_random_event")
-    intent_revealed = bool(state.get("intent_revealed", False))
-    drug_revealed = bool(state.get("drug_revealed", False))
-    wrong_drug_suspected = bool(state.get("wrong_drug_suspected", False))
-
-    # Konfiguracja sesji (Etap 1)
-    familiarity = str(state.get("familiarity", "first_meeting"))
-    register = str(state.get("register", "professional"))
-    warmth = str(state.get("warmth", "neutral"))
-    rep_name = (state.get("rep_name") or "").strip()
-    prior_visits_summary = (state.get("prior_visits_summary") or "").strip()
-
-    # Conviction (Etap 2)
-    conviction = state.get("conviction", {})
-
-    # Agenda (Etap 3)
-    doctor_agenda = state.get("doctor_agenda", [])
-
-    # ----------------------------------------------------------------
-    # Sekcja A — KIM JESTEŚ
-    # ----------------------------------------------------------------
-
-    rep_ref = f" {rep_name}" if rep_name else ""
-    if familiarity == "first_meeting":
-        familiarity_line = "Kontekst relacji: to pierwsza wizyta tej osoby — nie znasz jej."
-    elif familiarity == "acquainted":
-        familiarity_line = f"Kontekst relacji: znasz tę osobę{rep_ref} z poprzednich wizyt zawodowych."
-        if prior_visits_summary:
-            familiarity_line += f" {prior_visits_summary}"
-    else:
-        familiarity_line = f"Kontekst relacji: dobrze znasz tę osobę{rep_ref}, macie swobodną roboczą relację."
-        if prior_visits_summary:
-            familiarity_line += f" {prior_visits_summary}"
-
-    if register == "informal":
-        style_line = f"Komunikacja: jesteście na 'ty'.{(' Imię rozmówcy: ' + rep_name + '.') if rep_name else ''}"
-    elif register == "formal":
-        style_line = "Komunikacja: bardzo oficjalnie — 'Pan/Pani Doktor'."
-    else:
-        warmth_note = {"cool": " Rzeczowo, bez ekstra ciepła.", "warm": " Możesz być serdeczny.", "neutral": ""}.get(warmth, "")
-        style_line = f"Komunikacja: rejestr zawodowy — 'Pan/Pani Doktor'.{warmth_note}"
-
-    conviction_block = ""
-    if intent_revealed and conviction:
-        il = float(conviction.get("interest_level", 0.3))
-        tr = float(conviction.get("trust_in_rep", 0.3))
-        cc = float(conviction.get("clinical_confidence", 0.2))
-        pf = float(conviction.get("perceived_fit", 0.2))
-        dr = float(conviction.get("decision_readiness", 0.0))
-        conviction_block = (
-            f"\nTwój wewnętrzny stan przekonań (0.0–1.0):\n"
-            f"  zainteresowanie={il:.2f} | zaufanie={tr:.2f} | "
-            f"pewność_kliniczna={cc:.2f} | dopasowanie={pf:.2f} | gotowość_decyzji={dr:.2f}"
-        )
-
-    agenda_block = ""
-    if doctor_agenda:
-        lines = "\n".join(f"  [{item['kind']}] {item['content']}" for item in doctor_agenda)
-        agenda_block = f"\nTwoje wątki na tę rozmowę (wpleć naturalnie gdy pasuje):\n{lines}"
-
-    section_a = (
-        f"=== KIM JESTEŚ ===\n"
-        f"Jesteś {doctor.get('name', 'lekarzem')}. {doctor.get('context_str', doctor.get('description', ''))}\n"
-        f"Styl: {doctor.get('communication_style', 'profesjonalny')} | "
-        f"Płeć: {message_analysis.get('doctor_gender', 'female')} | "
-        f"Trudność rozmowy: {state.get('difficulty', 'medium')}\n"
-        f"Cechy: sceptycyzm={traits.get('skepticism', 0.5):.2f} | "
-        f"cierpliwość={traits.get('patience', 0.5):.2f} | "
-        f"otwartość={traits.get('openness', 0.5):.2f} | "
-        f"ego={traits.get('ego', 0.5):.2f} | "
-        f"presja_czasu={traits.get('time_pressure', 0.5):.2f}\n"
-        f"{familiarity_line}\n"
-        f"{style_line}"
-        f"{conviction_block}"
-        f"{agenda_block}"
-    )
-
-    # ----------------------------------------------------------------
-    # Sekcja z wiedzą o leku (warunkowa)
-    # ----------------------------------------------------------------
-
-    if wrong_drug_suspected and not drug_revealed:
-        drug_block = ""
-        phase_objective = "Rozmówca mówi o leku spoza Twoich zainteresowań. Wyraź brak zainteresowania i zasugeruj zakończenie wizyty."
-        situation_note = "Rozmówca przedstawia lek którego nie znasz i który Cię nie interesuje. Powiedz to wprost i krótko."
-    elif not intent_revealed:
-        drug_block = ""
-        phase_objective = "Do gabinetu weszła osoba — nie wiesz kim jest. Zapytaj krótko w czym możesz pomóc."
-        situation_note = "Nie wiesz kim jest ta osoba — może to pacjent, student, kolega lub przedstawiciel. Nie sugeruj żadnego tematu."
-    elif not drug_revealed:
-        drug_block = "Rozmówca ujawnił cel zawodowy, ale nie podał jeszcze konkretnego tematu.\n"
-        phase_objective = "Zapytaj o szczegóły celu wizyty."
-        situation_note = ""
-    else:
-        claim_view = {
-            "potwierdzone": len(claim_check.get("supported_claims", [])),
-            "fałszywe": len(claim_check.get("false_claims", [])),
-            "niepotwierdzone": len(claim_check.get("unsupported_claims", [])),
-            "pokrycie_krytycznych": f"{coverage_summary.get('covered_critical', 0)}/{coverage_summary.get('total_critical', 0)}",
-        }
-        drug_block = (
-            f"Wiedza o leku: znasz tylko to co powiedział rozmówca. "
-            f"Własną wiedzę cytuj jako zasłyszaną opinię.\n"
-            f"Weryfikacja twierdzeń: {json.dumps(claim_view, ensure_ascii=False)}\n"
-            f"{_rag_section(state)}"
-        )
-        phase_objective = PHASE_OBJECTIVES.get(state.get("phase", "opening"), "")
-        situation_note = ""
-
-    # ----------------------------------------------------------------
-    # Sekcja B — CO ROBISZ W TEJ TURZE
-    # ----------------------------------------------------------------
-
-    turn_line = (
-        f"Tura {state.get('turn_index', 0)}/{state.get('max_turns', 10)} | "
-        f"Faza: {state.get('phase', 'opening')} | "
-        f"Frustracja: {state.get('frustration_score', 0.0):.1f}/10 | "
-        f"Pozostało: {style_runtime.get('remaining_turns', 5)} tur"
-    )
-    if random_event:
-        turn_line += f"\nZdarzenie: {random_event['event_name']} — {random_event['event_details']}"
-
-    top_directives = behavior_directives[:2]
-    directives_text = (
-        "\n".join(f"  • {d}" for d in top_directives)
-        if top_directives else "  • Reaguj naturalnie."
-    )
-
-    turn_mode = str(state.get("current_turn_mode", "REACT"))
-    turn_mode_instructions = {
-        "REACT": "Odpowiedz bezpośrednio na to co powiedział rozmówca. Możesz dopytać o jeden szczegół.",
-        "PROBE": "Zadaj pytanie wynikające z własnej ciekawości lub agendy — nie czekaj na inicjatywę rozmówcy.",
-        "SHARE": "Zacznij od własnego doświadczenia klinicznego lub przypadku pacjenta. Nie pytaj od razu — najpierw opowiedz.",
-        "CHALLENGE": "Zakwestionuj konkretne twierdzenie lub metodologię. Bądź precyzyjny, nie ogólnikowy.",
-        "DRIFT": "Wpleć naturalnie wątek z agendy — może to być krótka dygresja, zanim wrócisz do tematu.",
-        "CLOSE": "Zmierzaj do zakończenia rozmowy — podsumuj lub powiedz że musisz kończyć.",
-    }
-    mode_instruction = turn_mode_instructions.get(turn_mode, turn_mode_instructions["REACT"])
-
-    section_b = (
-        f"=== CO ROBISZ W TEJ TURZE ===\n"
-        f"{turn_line}\n"
-        f"Cel fazy: {phase_objective}\n"
-        + (f"{situation_note}\n" if situation_note else "")
-        + f"Tryb tury: {turn_mode} — {mode_instruction}\n"
-        + f"Dyrektywy:\n{directives_text}"
-    )
-
-    # ----------------------------------------------------------------
-    # Sekcja C — TWARDE BEZPIECZNIKI
-    # ----------------------------------------------------------------
-
-    if register == "informal":
-        form_rule = "Jesteście na 'ty' — nie koryguj formy grzecznościowej."
-    else:
-        form_rule = f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj błędy grzecznościowe."
-
-    if conviction:
-        tr = float(conviction.get("trust_in_rep", 0.3))
-        dr = float(conviction.get("decision_readiness", 0.0))
-        if tr < 0.25:
-            conviction_rule = "Zaufanie krytycznie niskie — zmierzasz do odrzucenia propozycji."
-        elif dr >= 0.75:
-            conviction_rule = "Gotowość decyzji wysoka — możesz zasygnalizować decyzję."
-        else:
-            conviction_rule = f"Decyzja wynika z conviction (zaufanie={tr:.2f}, gotowość={dr:.2f})."
-    else:
-        conviction_rule = "Decyzja: undecided dopóki nie masz podstaw."
-
-    section_c = (
-        f"=== TWARDE BEZPIECZNIKI ===\n"
-        f"1. Odpowiadaj wyłącznie po polsku.\n"
-        f"2. Korupcja lub niestosowna propozycja → zakończ rozmowę natychmiast.\n"
-        f"3. {form_rule}\n"
-        f"4. Liczby i dane leku: cytuj tylko jako zasłyszaną opinię ('Słyszałam od koleżanki...'), nigdy jako własne fakty.\n"
-        f"5. {conviction_rule}\n"
-        f"6. doctor_decision: undecided | trial_use | will_prescribe | recommend | reject\n"
-        f"7. doctor_attitude: happy | neutral | serious | sad\n"
-        f"8. Nigdy nie mów 'Jestem pani/pan doktor' — reaguj naturalnie."
-    )
-
-    return f"{section_a}\n\n{section_b}\n{drug_block}\n{section_c}\n"
-
-
 def node_generate_response(state: ConversationState, config: RunnableConfig) -> Dict:
     """Wywołuje LLM — generuje ustrukturyzowaną odpowiedź lekarza."""
     api_key = config.get("configurable", {}).get("api_key", "")
@@ -637,7 +418,6 @@ def node_generate_response(state: ConversationState, config: RunnableConfig) -> 
     system_prompt = _build_system_prompt(state)
     lc_messages = [SystemMessage(content=system_prompt)]
 
-    # Dołącz historię rozmowy z wcześniejszych tur
     for msg in state.get("messages", []):
         role = msg.get("role", "")
         content = msg.get("content", "")
@@ -646,7 +426,6 @@ def node_generate_response(state: ConversationState, config: RunnableConfig) -> 
         elif role == "assistant":
             lc_messages.append(AIMessage(content=content))
 
-    # Bieżąca wiadomość użytkownika
     lc_messages.append(HumanMessage(content=str(state.get("current_user_message", ""))))
 
     logger.info(
@@ -675,7 +454,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     style_runtime = state.get("current_style_runtime", {"max_sentences": 3, "remaining_turns": 5, "directives": []})
     random_event = state.get("current_random_event")
 
-    # --- Zbierz błędy wykryte przez model + reguły ---
+    # --- Błędy wykryte przez model + reguły ---
     final_errors = list(ai_response.detected_errors if ai_response else [])
     if message_analysis.get("marketing_hits"):
         final_errors.append("Użycie sloganów marketingowych bez danych klinicznych.")
@@ -751,12 +530,12 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     elif float(state.get("frustration_score", 0.0)) >= 6.0:
         final_attitude = "serious"
 
-    # --- Decyzja lekarza (inferencja z LLM jako fallback dla loggera) ---
+    # --- Decyzja lekarza (inferencja z LLM jako fallback) ---
     ai_decision = normalize_doctor_decision(getattr(ai_response, "doctor_decision", "undecided"))
     if ai_decision == "undecided":
         ai_decision = infer_decision_from_message(doctor_message)
 
-    # --- Aktualizacja conviction (Etap 2) ---
+    # --- Aktualizacja conviction ---
     new_conviction = update_conviction(
         conviction=dict(state.get("conviction", {})),
         claim_check=claim_check,
@@ -768,10 +547,10 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         preferred_strategies=list(state.get("preferred_strategies", [])),
     )
 
-    # --- Decyzja z conviction (Etap 2) — zastępuje evaluate_conversation_goal jako źródło decyzji ---
+    # --- Decyzja z conviction (źródło decyzji) ---
     conviction_decision = derive_decision_from_conviction(new_conviction, state)
 
-    # --- Ocena celu rozmowy (LOGGER — zostaje dla raportu końcowego, nie steruje decyzją) ---
+    # --- Ocena celu rozmowy (logger — nie steruje decyzją) ---
     conversation_goal = evaluate_conversation_goal(
         state=state,
         turn_metrics=turn_metrics,
@@ -781,11 +560,9 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         doctor_decision=ai_decision,
         doctor_attitude=final_attitude,
     )
-    # Podmień doctor_decision w goal na conviction_decision (spójność danych w raporcie)
     conversation_goal["doctor_decision"] = conviction_decision
 
-    # Korekta spójności score ↔ conviction: jeśli conviction jest pozytywne,
-    # score musi to odzwierciedlać — inaczej feedback jest sprzeczny z decyzją
+    # Korekta spójności score ↔ conviction
     if conviction_decision in {"trial_use", "will_prescribe", "recommend"}:
         if conversation_goal.get("score", 0) < 60:
             conversation_goal["score"] = 60
@@ -826,7 +603,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     if bool(conversation_goal.get("achieved")) and goal_achieved_turn == 0:
         goal_achieved_turn = turn_index
 
-    # Historyzuj tryb tury (Etap 4)
+    # Historyzuj tryb tury
     turn_modes_history = list(state.get("turn_modes_history", []))
     turn_modes_history.append(str(state.get("current_turn_mode", "REACT")))
 
