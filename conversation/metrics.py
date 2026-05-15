@@ -7,7 +7,11 @@ from .constants import CLAIM_SEVERITY_WEIGHTS, PHASES
 
 
 def compute_turn_metrics(message_analysis: Dict, claim_check: Dict, state: Dict) -> Dict:
-    """Liczy metryki jakości tury, w tym coverage claimów krytycznych."""
+    """Oblicza 5 metryk jakości wypowiedzi przedstawiciela w bieżącej turze.
+
+    Zwraca: topic_adherence, clinical_precision, ethics, language_quality,
+    critical_claim_coverage — wszystkie w zakresie [0.0, 1.0].
+    """
     coverage = critical_coverage_summary(state)
     turn_index = int(state.get("turn_index", 0))
     max_turns = max(1, int(state.get("max_turns", 7)))
@@ -58,7 +62,7 @@ def compute_frustration(
     difficulty_cfg: Dict,
     preferred_strategies: List[str],
 ) -> Dict:
-    """Aktualizuje frustrację lekarza na podstawie jakości tury."""
+    """Oblicza deltę i nową wartość frustracji lekarza — uwzględnia claimy, etykę, off-topic, strategie i postęp rozmowy."""
     delta = 0.0
     severity_counts = claim_check.get("severity_counts", {})
     critical_count = int(severity_counts.get("critical", 0))
@@ -132,7 +136,12 @@ def compute_frustration(
 
 
 def advance_phase(current_phase: str, state: Dict, message_analysis: Dict, metrics: Dict) -> Dict:
-    """Przełącza fazę rozmowy zgodnie z regułami state-machine."""
+    """Przełącza fazę rozmowy zgodnie z regułami state-machine.
+
+    Fazy: opening → needs → objection → evidence → close.
+    Naruszenie etyki lub przekroczenie limitu/frustracji wymusza natychmiastowe przejście do close.
+    Zwraca dict z kluczami 'phase' i 'reason'.
+    """
     phase = current_phase if current_phase in PHASES else "opening"
     turn_index = int(state.get("turn_index", 0))
     max_turns = int(state.get("max_turns", 7))

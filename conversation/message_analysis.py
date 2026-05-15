@@ -20,7 +20,11 @@ from .constants import (
 
 
 def limit_sentences(text: str, max_sentences: int) -> str:
-    """Przycina wypowiedź do zadanej liczby zdań."""
+    """Przycina tekst do max_sentences zdań, zachowując pełne pierwsze zdania.
+
+    Używane przez policy_postprocess_message do skracania odpowiedzi lekarza
+    zgodnie z dyrektywami stylu (np. max 1–2 zdania przy wysokiej presji czasu).
+    """
     cleaned = text.strip()
     if max_sentences <= 0 or not cleaned:
         return cleaned
@@ -32,7 +36,7 @@ def limit_sentences(text: str, max_sentences: int) -> str:
 
 
 def normalize_gender(value: str) -> str:
-    """Normalizuje zapis płci lekarza do female/male/unknown."""
+    """Mapuje różne warianty zapisu płci (pl/en) na kanoniczne female/male/unknown."""
     normalized = str(value or "").strip().lower()
     if normalized in {"female", "f", "kobieta", "kobieta_lekarz", "żeńska", "zenska"}:
         return "female"
@@ -42,7 +46,7 @@ def normalize_gender(value: str) -> str:
 
 
 def expected_address_form(gender: str) -> str:
-    """Zwraca oczekiwaną formę zwracania się do lekarza."""
+    """Zwraca poprawną formę grzecznościową (pani/pan doktor) zależną od płci lekarza."""
     if gender == "female":
         return "pani doktor"
     if gender == "male":
@@ -51,7 +55,7 @@ def expected_address_form(gender: str) -> str:
 
 
 def detect_gender_addressing(message: str, doctor_gender: str) -> Dict:
-    """Wykrywa niepoprawne formy grzecznościowe względem płci lekarza."""
+    """Wykrywa użycie formy grzecznościowej niezgodnej z płcią lekarza; zwraca listę trafionych form i oczekiwany wzorzec."""
     text = message.lower()
     male_hits = [form for form in MALE_ADDRESS_FORMS if form in text]
     female_hits = [form for form in FEMALE_ADDRESS_FORMS if form in text]
@@ -82,7 +86,7 @@ def analyze_message(
     doctor_profile: Dict,
     focus_keywords: Optional[Set[str]] = None,
 ) -> Dict:
-    """Wykrywa sygnały jakościowe i etyczne w wypowiedzi przedstawiciela."""
+    """Skanuje wiadomość pod kątem korupcji, off-topic, buzzwordów, anglicyzmów, niestosowności, braku szacunku, formy grzecznościowej i wzmianek o leku."""
     text = message.lower()
     drug_keywords = focus_keywords if focus_keywords is not None else extract_drug_keywords(drug_info)
     doctor_gender = normalize_gender(doctor_profile.get("gender", "unknown"))

@@ -24,17 +24,20 @@ def normalize_text(text: str) -> str:
 
 
 def extract_drug_intro_keywords(drug_info: Dict) -> List[str]:
+    """Wyciąga tokeny (≥4 znaki) z id i nazwy leku — służą do wykrywania pierwszego wprowadzenia leku."""
     raw = " ".join([str(drug_info.get("id", "")), str(drug_info.get("nazwa", ""))])
     text = normalize_text(raw)
     return list(dict.fromkeys(t for t in re.findall(r"[a-z0-9-]{4,}", text)))
 
 
 def detect_drug_introduction(message: str, intro_keywords: List[str]) -> List[str]:
+    """Zwraca tokeny leku znalezione w wiadomości — gdy niepuste, uznajemy że lek został wprowadzony."""
     text = normalize_text(message)
     return list(dict.fromkeys(kw for kw in intro_keywords if kw and kw in text))
 
 
 def detect_conversation_intent(message: str) -> List[str]:
+    """Wykrywa sygnały intencji farmaceutycznej (lek, terapia, dawkowanie…) w wiadomości."""
     text = normalize_text(message)
     return list(dict.fromkeys(kw for kw in INTENT_SIGNAL_KEYWORDS if kw in text))
 
@@ -60,6 +63,7 @@ def detect_wrong_drug(message: str, drug_intro_keywords: List[str]) -> bool:
 
 
 def build_turn_metrics_payload(turn_metrics: Dict, frustration_score: float) -> Dict:
+    """Pakuje metryki tury i frustrację do płaskiego dicta dla response API."""
     return {
         "topic_adherence": float(turn_metrics.get("topic_adherence", 0.0)),
         "clinical_precision": float(turn_metrics.get("clinical_precision", 0.0)),

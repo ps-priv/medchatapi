@@ -24,6 +24,11 @@ GENERIC_CLINICAL_PHRASES = {
 
 
 def build_sensitive_drug_phrases(drug_info: Dict) -> List[str]:
+    """Buduje listę fraz z danych leku, których lekarz nie powinien znać bez podania przez przedstawiciela.
+
+    Filtruje zbyt ogólne terminy (wskazania, dawkowanie…) — zostawia frazy z liczbami
+    lub wielowyrazowe frazy specyficzne dla konkretnego produktu.
+    """
     candidates: List[str] = []
     for claim in drug_info.get("claims", []) if isinstance(drug_info.get("claims"), list) else []:
         if not isinstance(claim, dict):
@@ -55,6 +60,10 @@ def build_sensitive_drug_phrases(drug_info: Dict) -> List[str]:
 
 
 def pick_hearsay_phrase(session_id: str, turn_index: int) -> str:
+    """Wybiera deterministycznie frazę "zasłyszałam, że..." na podstawie sesji i numeru tury.
+
+    Dzięki deterministyczności ta sama sesja zawsze używa tych samych fraz — brak losowości w testach.
+    """
     seed = f"{session_id}|{turn_index}|hearsay"
     digest = hashlib.sha256(seed.encode()).hexdigest()
     idx = int(digest[:8], 16) % len(HEARSAY_PHRASES)
@@ -62,7 +71,7 @@ def pick_hearsay_phrase(session_id: str, turn_index: int) -> str:
 
 
 def extract_representative_text_from_messages(messages: List[Dict[str, str]]) -> str:
-    """Wyciąga łączony znormalizowany tekst wypowiedzi przedstawiciela z historii LLM."""
+    """Łączy i normalizuje wszystkie wypowiedzi przedstawiciela (role='user') z historii — daje bazę do porównania z treścią odpowiedzi lekarza."""
     parts = [m["content"] for m in messages if m.get("role") == "user"]
     return normalize_text(" ".join(parts))
 

@@ -27,6 +27,7 @@ NEGATIVE_DECISIONS = {"reject"}
 
 
 def normalize_doctor_decision(value: str) -> str:
+    """Mapuje dowolny zapis decyzji lekarza (pl/en, aliasy) na kanoniczne wartości DECISION_MAP."""
     return DECISION_MAP.get(str(value or "").strip().lower(), "undecided")
 
 

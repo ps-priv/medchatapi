@@ -64,6 +64,7 @@ EMPTY_CLAIM_CHECK = {
 # ---------------------------------------------------------------------------
 
 def node_detect_context(state: ConversationState) -> Dict:
+    """Wykrywa intencję farmaceutyczną i pierwsze wprowadzenie leku — aktualizuje flagi intent_revealed/drug_revealed."""
     message = str(state.get("current_user_message", ""))
     updates: Dict = {}
 
@@ -96,6 +97,7 @@ def node_detect_context(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_analyze(state: ConversationState) -> Dict:
+    """Analizuje wypowiedź: claimy medyczne, pokrycie claimów krytycznych, sygnały evidence, sygnały etyczne."""
     message = str(state.get("current_user_message", ""))
     drug_info = state.get("drug_info", {})
     doctor_profile = state.get("doctor_profile", {})
@@ -143,6 +145,7 @@ def node_analyze(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_policy_check(state: ConversationState) -> Dict:
+    """Buduje twarde dyrektywy policy (hard_stop, formą adresu, off-topic) przed wywołaniem LLM."""
     pre_policy = policy_precheck(
         message_analysis=state.get("current_analysis", {}),
         claim_check=state.get("current_claim_check", {}),
@@ -155,6 +158,7 @@ def node_policy_check(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_ethics_stop(state: ConversationState) -> Dict:
+    """Wymusza natychmiastowe zakończenie rozmowy przy naruszeniu etyki (korupcja/niestosowna propozycja)."""
     forced_message = "Stanowczo odrzucam taką propozycję. To narusza zasady etyki i kończę tę rozmowę natychmiast."
     forced_goal = forced_goal_payload(
         state=state,
@@ -194,6 +198,7 @@ def node_ethics_stop(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_update_state(state: ConversationState) -> Dict:
+    """Oblicza metryki tury, aktualizuje frustrację, fazę i cechy lekarza; losuje zdarzenie losowe."""
     message_analysis = state.get("current_analysis", {})
     claim_check = state.get("current_claim_check", {})
 
@@ -255,6 +260,7 @@ def node_update_state(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_time_stop(state: ConversationState) -> Dict:
+    """Wymusza zakończenie rozmowy po przekroczeniu limitu tur — lekarz kończy z powodu braku czasu."""
     max_turns = int(state.get("max_turns", 10))
     turn_metrics = state.get("current_turn_metrics", EMPTY_TURN_METRICS)
     forced_message = "Kończę spotkanie, nie mam już czasu. Jeśli to możliwe, proszę przesłać najważniejsze informacje o leku pisemnie."
@@ -302,6 +308,7 @@ def node_time_stop(state: ConversationState) -> Dict:
 # ---------------------------------------------------------------------------
 
 def node_build_directives(state: ConversationState) -> Dict:
+    """Scala dyrektywy stylu, policy, zdarzenia losowego i coverage gap w listę instrukcji dla LLM."""
     message_analysis = state.get("current_analysis", {})
     coverage_update = state.get("current_coverage_update", {})
     evidence_reqs = state.get("current_evidence_requirements", {})

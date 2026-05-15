@@ -6,7 +6,10 @@ from .constants import SUPPORTED_STRATEGIES, TRAIT_KEYS
 
 
 def clamp_traits(traits: Dict[str, float]) -> Dict[str, float]:
-    """Normalizuje cechy psychologiczne do zakresu 0.0-1.0."""
+    """Przycina wszystkie cechy psychologiczne lekarza do zakresu [0.0, 1.0].
+
+    Wywołuj po każdej modyfikacji traits, żeby wartości nie wyszły poza skalę.
+    """
     clamped: Dict[str, float] = {}
     for key in TRAIT_KEYS:
         value = float(traits.get(key, 0.5))
@@ -15,7 +18,7 @@ def clamp_traits(traits: Dict[str, float]) -> Dict[str, float]:
 
 
 def normalize_difficulty(value: str) -> str:
-    """Normalizuje poziom trudności do easy/medium/hard."""
+    """Mapuje różne warianty zapisu trudności (pl/en) na kanoniczne easy/medium/hard."""
     normalized = str(value or "").strip().lower()
     if normalized in {"easy", "łatwy", "latwy"}:
         return "easy"
@@ -25,7 +28,7 @@ def normalize_difficulty(value: str) -> str:
 
 
 def extract_preferred_strategies(doctor_profile: Dict) -> List[str]:
-    """Pobiera i filtruje strategie lekarza do wspieranego zbioru."""
+    """Pobiera strategie z profilu lekarza i filtruje do SUPPORTED_STRATEGIES — zachowuje kolejność bez duplikatów."""
     raw = doctor_profile.get("preferred_strategies", [])
     if not isinstance(raw, list):
         return []
@@ -39,7 +42,11 @@ def extract_preferred_strategies(doctor_profile: Dict) -> List[str]:
 
 
 def difficulty_profile(difficulty: str) -> Dict:
-    """Mapuje trudność na parametry sterujące tempem i surowością rozmowy."""
+    """Zwraca zestaw parametrów liczbowych dla danego poziomu trudności.
+
+    Wynikowy dict zawiera: frustration_bias, close_phase_threshold,
+    termination_frustration_threshold, turn_limit_adjust.
+    """
     normalized = normalize_difficulty(difficulty)
     if normalized == "easy":
         return {
@@ -67,7 +74,11 @@ def difficulty_profile(difficulty: str) -> Dict:
 
 
 def derive_turn_limit(traits: Dict[str, float], difficulty_cfg: Dict) -> int:
-    """Wylicza limit tur na bazie presji czasu, cierpliwości i trudności."""
+    """Wyznacza maksymalną liczbę tur sesji (10–20) na podstawie cech lekarza i trudności.
+
+    Wysoka presja czasu lub niska cierpliwość skracają rozmowę; trudny archetyp redukuje
+    limit o 1, łatwy go wydłuża.
+    """
     time_pressure = float(traits.get("time_pressure", 0.5))
     patience = float(traits.get("patience", 0.5))
 
@@ -87,7 +98,7 @@ def derive_turn_limit(traits: Dict[str, float], difficulty_cfg: Dict) -> int:
 
 
 def build_style_directives(doctor_profile: Dict, traits: Dict[str, float], state: Dict) -> Dict:
-    """Buduje aktywne dyrektywy stylu lekarza do promptu systemowego."""
+    """Buduje aktywne dyrektywy stylu lekarza (max_sentences, lista instrukcji) na podstawie cech, strategii i kontekstu tury."""
     style = str(doctor_profile.get("communication_style", "")).lower()
     directives: List[str] = []
     max_sentences = 3

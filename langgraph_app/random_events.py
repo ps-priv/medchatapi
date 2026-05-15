@@ -45,11 +45,21 @@ RANDOM_EVENT_TEMPLATES = (
 
 
 def deterministic_probability(seed: str) -> float:
+    """Zwraca pseudo-losową liczbę [0, 1) deterministyczną dla danego seed (SHA-256).
+
+    Gwarantuje powtarzalność wyników przy tych samych danych sesji i tury.
+    """
     digest = hashlib.sha256(seed.encode()).hexdigest()
     return int(digest[:12], 16) / float(0xFFFFFFFFFFFF)
 
 
 def select_random_event(session_id: str, message: str, state: ConversationState) -> Optional[Dict]:
+    """Losuje zdarzenie zakłócające (telefon, kolejka, wezwanie) lub zwraca None.
+
+    Zdarzenie nie może wystąpić przed turą 2 ani częściej niż co 2 tury.
+    Prawdopodobieństwo rośnie wraz z frustracją lekarza i numerem tury.
+    Wybierane jest zdarzenie z najwyższą proporcją roll/probability (bardziej "zaskakujące").
+    """
     turn_index = int(state.get("turn_index", 0))
     if turn_index < 2:
         return None
@@ -82,7 +92,7 @@ def select_random_event(session_id: str, message: str, state: ConversationState)
 
 
 def apply_random_event(state: ConversationState) -> Dict:
-    """Nakłada skutki zdarzenia losowego, zwraca dict zmian stanu."""
+    """Losuje zdarzenie zakłócające i nakłada jego skutki (traits, frustracja, max_turns) na stan — lub zwraca pusty dict jeśli nie trafiło."""
     selected = select_random_event(
         session_id=str(state.get("session_id", "")),
         message=str(state.get("current_user_message", "")),
