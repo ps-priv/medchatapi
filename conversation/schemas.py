@@ -378,6 +378,14 @@ class FinishConversationResponse(BaseModel):
     conversation_history: List[ConversationTurn] = Field(description="Pelna historia rozmowy.")
     conversation_goal: ConversationGoal = Field(description="Koncowy status realizacji celu rozmowy.")
     evaluation: EvaluationResult = Field(description="Ocena koncowa przygotowana przez ewaluator LLM.")
+    turn_mode_histogram: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Histogram trybów tur (REACT/PROBE/SHARE/CHALLENGE/DRIFT/CLOSE) — Etap 4.",
+    )
+    turn_mode_flag: Optional[str] = Field(
+        default=None,
+        description="Flaga jeśli rozmowa była zbyt jednostronna (>80% REACT przy ≥4 turach).",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

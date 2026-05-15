@@ -125,5 +125,11 @@ if "error" not in fin:
     print(f"  trafność={ev.get('relevance_score','?')}/10")
     print(f"  relacja={ev.get('relationship_score','?')}/10")
     print(f"  feedback: {ev.get('final_feedback','')}")
+    hist = fin.get("turn_mode_histogram", {})
+    if hist:
+        print(f"\nHistogram trybów tur: {hist}")
+    flag = fin.get("turn_mode_flag")
+    if flag:
+        print(f"  ⚠ {flag}")
 else:
     print("BŁĄD /finish:", fin)

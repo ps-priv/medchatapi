@@ -9,6 +9,7 @@ from .nodes import (
     node_ethics_stop,
     node_finalize,
     node_generate_response,
+    node_plan_turn,
     node_policy_check,
     node_retrieve_context,
     node_time_stop,
@@ -27,7 +28,7 @@ def build_graph() -> StateGraph:
             ├─[hard_stop]──→ ethics_stop → END
             └─[continue]──→ update_state
                 ├─[time_limit]──→ time_stop → END
-                └─[continue]──→ build_directives → retrieve_context → generate_response → finalize → END
+                └─[continue]──→ build_directives → plan_turn → retrieve_context → generate_response → finalize → END
     """
     graph = StateGraph(ConversationState)
 
@@ -38,6 +39,7 @@ def build_graph() -> StateGraph:
     graph.add_node("update_state", node_update_state)
     graph.add_node("time_stop", node_time_stop)
     graph.add_node("build_directives", node_build_directives)
+    graph.add_node("plan_turn", node_plan_turn)
     graph.add_node("retrieve_context", node_retrieve_context)
     graph.add_node("generate_response", node_generate_response)
     graph.add_node("finalize", node_finalize)
@@ -61,7 +63,8 @@ def build_graph() -> StateGraph:
     )
     graph.add_edge("time_stop", END)
 
-    graph.add_edge("build_directives", "retrieve_context")
+    graph.add_edge("build_directives", "plan_turn")
+    graph.add_edge("plan_turn", "retrieve_context")
     graph.add_edge("retrieve_context", "generate_response")
     graph.add_edge("generate_response", "finalize")
     graph.add_edge("finalize", END)

@@ -74,12 +74,14 @@ class ConversationState(TypedDict, total=False):
 
     # Logi historyczne
     turn_metrics_history: List[Dict[str, Any]]
+    turn_modes_history: List[str]    # kolejność trybów tur — do histogramu w /finish (Etap 4)
     critical_flags: List[str]
     random_events_history: List[Dict[str, Any]]
     last_random_event_turn: int
     is_terminated: bool
 
     # Dane robocze bieżącej tury (nadpisywane co turę)
+    current_turn_mode: str           # tryb tury: REACT | PROBE | SHARE | CHALLENGE | DRIFT | CLOSE (Etap 4)
     current_user_message: str
     current_analysis: Dict[str, Any]
     current_claim_check: Dict[str, Any]

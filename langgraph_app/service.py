@@ -3,6 +3,7 @@
 import json
 import logging
 import uuid
+from collections import Counter
 from typing import Dict, Optional
 
 from fastapi import HTTPException
@@ -291,9 +292,18 @@ Oceń przedstawiciela pod kątem:
 
     del sessions[session_id]
 
+    # Histogram trybów tur (Etap 4)
+    turn_modes = list(state.get("turn_modes_history", []))
+    mode_histogram = dict(Counter(turn_modes))
+    total_turns = len(turn_modes) or 1
+    react_ratio = mode_histogram.get("REACT", 0) / total_turns
+    one_sided_flag = react_ratio > 0.80 and total_turns >= 4
+
     return {
         "status": "Rozmowa zakończona, sesja usunięta.",
         "conversation_history": history_list,
         "conversation_goal": latest_goal,
         "evaluation": evaluation_dict,
+        "turn_mode_histogram": mode_histogram,
+        "turn_mode_flag": "rozmowa zbyt jednostronna — lekarz tylko reagował" if one_sided_flag else None,
     }

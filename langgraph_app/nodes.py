@@ -42,6 +42,7 @@ from .helpers import (
     forced_goal_payload,
     infer_decision_from_message,
     normalize_doctor_decision,
+    plan_turn_mode,
 )
 from .state import ConversationState
 
@@ -374,7 +375,21 @@ def node_build_directives(state: ConversationState) -> Dict:
 
 
 # ---------------------------------------------------------------------------
-# Węzeł 6b: retrieval kontekstu RAG z Chroma
+# Węzeł 6b: planowanie trybu tury (heurystyka, bez LLM)
+# ---------------------------------------------------------------------------
+
+def node_plan_turn(state: ConversationState) -> Dict:
+    """Wyznacza tryb tury heurystycznie i zapisuje go w stanie."""
+    mode = plan_turn_mode(state)
+    logger.debug(
+        "turn_mode session=%s turn=%d mode=%s",
+        state.get("session_id", "?"), state.get("turn_index", 0), mode,
+    )
+    return {"current_turn_mode": mode}
+
+
+# ---------------------------------------------------------------------------
+# Węzeł 6c: retrieval kontekstu RAG z Chroma
 # ---------------------------------------------------------------------------
 
 def node_retrieve_context(state: ConversationState, config: RunnableConfig) -> Dict:
@@ -552,11 +567,23 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
         if top_directives else "  • Reaguj naturalnie."
     )
 
+    turn_mode = str(state.get("current_turn_mode", "REACT"))
+    turn_mode_instructions = {
+        "REACT": "Odpowiedz bezpośrednio na to co powiedział rozmówca. Możesz dopytać o jeden szczegół.",
+        "PROBE": "Zadaj pytanie wynikające z własnej ciekawości lub agendy — nie czekaj na inicjatywę rozmówcy.",
+        "SHARE": "Zacznij od własnego doświadczenia klinicznego lub przypadku pacjenta. Nie pytaj od razu — najpierw opowiedz.",
+        "CHALLENGE": "Zakwestionuj konkretne twierdzenie lub metodologię. Bądź precyzyjny, nie ogólnikowy.",
+        "DRIFT": "Wpleć naturalnie wątek z agendy — może to być krótka dygresja, zanim wrócisz do tematu.",
+        "CLOSE": "Zmierzaj do zakończenia rozmowy — podsumuj lub powiedz że musisz kończyć.",
+    }
+    mode_instruction = turn_mode_instructions.get(turn_mode, turn_mode_instructions["REACT"])
+
     section_b = (
         f"=== CO ROBISZ W TEJ TURZE ===\n"
         f"{turn_line}\n"
         f"Cel fazy: {phase_objective}\n"
         + (f"{situation_note}\n" if situation_note else "")
+        + f"Tryb tury: {turn_mode} — {mode_instruction}\n"
         + f"Dyrektywy:\n{directives_text}"
     )
 
@@ -788,10 +815,15 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     if bool(conversation_goal.get("achieved")) and goal_achieved_turn == 0:
         goal_achieved_turn = turn_index
 
+    # Historyzuj tryb tury (Etap 4)
+    turn_modes_history = list(state.get("turn_modes_history", []))
+    turn_modes_history.append(str(state.get("current_turn_mode", "REACT")))
+
     return {
         "messages": new_messages,
         "traits": updated_traits,
         "conviction": new_conviction,
+        "turn_modes_history": turn_modes_history,
         "is_terminated": is_terminated,
         "phase": "close" if is_terminated else state.get("phase", "opening"),
         "critical_flags": flags,

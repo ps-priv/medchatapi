@@ -232,10 +232,12 @@ def build_initial_state(
         goal_achieved_turn=0,
         latest_goal={},
         turn_metrics_history=[],
+        turn_modes_history=[],
         critical_flags=[],
         random_events_history=[],
         last_random_event_turn=-999,
         is_terminated=False,
+        current_turn_mode="REACT",
         current_user_message="",
         current_analysis={},
         current_claim_check={},
@@ -389,6 +391,47 @@ def evaluate_conversation_goal(state: ConversationState, turn_metrics: Dict, cla
         reasons=list(dict.fromkeys(reasons))[:5],
         missing=list(dict.fromkeys(missing))[:6],
     ).model_dump()
+
+
+def plan_turn_mode(state: ConversationState) -> str:
+    """Wyznacza tryb tury heurystycznie — bez wywołania LLM.
+
+    Tryby: REACT | PROBE | SHARE | CHALLENGE | DRIFT | CLOSE
+    Kolejność reguł jest hierarchiczna: hard rules mają priorytet.
+    """
+    turn = int(state.get("turn_index", 0))
+    frustration = float(state.get("frustration_score", 0.0))
+    analysis = state.get("current_analysis", {})
+    claim_check = state.get("current_claim_check", {})
+    agenda = state.get("doctor_agenda", [])
+    conviction = state.get("conviction", {})
+    intent_revealed = bool(state.get("intent_revealed", False))
+    session_id = str(state.get("session_id", ""))
+
+    # Hard rules — blokujące
+    if frustration > 7.0 or turn >= int(state.get("max_turns", 10)):
+        return "CLOSE"
+    if not intent_revealed:
+        return "PROBE"
+
+    # Konfrontacja gdy fałszywe lub nieodpowiednie zachowanie
+    has_false_claims = bool(claim_check.get("false_claims"))
+    has_violations = bool(analysis.get("inappropriate_hits") or analysis.get("disrespect_hits"))
+    has_marketing = bool(analysis.get("marketing_hits") or analysis.get("english_hits"))
+    if has_false_claims or has_violations or has_marketing:
+        return "CHALLENGE"
+
+    # Co 4 tury — SHARE jeśli jest niezużyty wątek patient_case i lekarz jest zainteresowany
+    unused_cases = [a for a in agenda if a.get("kind") == "patient_case" and not a.get("used")]
+    interest = float(conviction.get("interest_level", 0.3))
+    if turn % 4 == 3 and unused_cases and interest > 0.4:
+        return "SHARE"
+
+    # ~10% szans na DRIFT po turze 3 (deterministyczne z seed sesji)
+    if turn >= 3 and deterministic_probability(f"{session_id}|{turn}|drift") < 0.10:
+        return "DRIFT"
+
+    return "REACT"
 
 
 def derive_decision_from_conviction(conviction: Dict[str, float], state: ConversationState) -> str:
