@@ -36,6 +36,9 @@ class ConversationState(TypedDict, total=False):
     # 5-wymiarowy stan przekonań lekarza (Etap 2)
     conviction: Dict[str, float]
 
+    # Własne wątki lekarza generowane raz na starcie sesji (Etap 3)
+    doctor_agenda: List[Dict[str, Any]]
+
     # Postęp rozmowy
     turn_index: int
     max_turns: int

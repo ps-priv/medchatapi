@@ -206,6 +206,7 @@ def build_initial_state(
         # Pozostałe pola
         traits=initial_traits,
         conviction=initial_conviction,
+        doctor_agenda=[],
         turn_index=0,
         max_turns=max_turns,
         phase="opening",
@@ -637,13 +638,13 @@ def check_termination(state: ConversationState, message_analysis: Dict) -> Tuple
     if turn_index >= max_turns and (float(traits.get("time_pressure", 0.5)) >= 0.7 or state.get("phase") == "close"):
         return True, f"Lekarz zakończył rozmowę po osiągnięciu limitu tur ({max_turns})."
 
-    if turn_index < 3:
+    if turn_index < 5:
         if message_analysis.get("bribery_hits"):
             return True, "Lekarz zakończył rozmowę z powodu naruszenia etyki."
         return False, None
 
     should_terminate = (
-        float(traits.get("patience", 0.5)) <= 0.2
+        float(traits.get("patience", 0.5)) <= 0.1
         or float(traits.get("time_pressure", 0.5)) >= 0.8
         or float(state.get("frustration_score", 0.0)) >= float(state.get("termination_frustration_threshold", 8.0))
         or (

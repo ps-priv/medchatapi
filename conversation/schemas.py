@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -106,6 +106,15 @@ class SessionConfig(BaseModel):
             }
         }
     )
+
+
+class AgendaItem(BaseModel):
+    """Jeden wątek własny lekarza do naturalnego wplecenia w rozmowę (Etap 3)."""
+
+    kind: Literal["clinical_curiosity", "patient_case", "concern", "personal", "time_pressure"]
+    content: str = Field(description="Treść wątku w pierwszej osobie, 1-2 zdania po polsku.")
+    used: bool = Field(default=False, description="Czy wątek został już użyty w rozmowie.")
+    priority: int = Field(default=2, ge=1, le=3, description="Priorytet: 1=niski, 2=średni, 3=ważny.")
 
 
 class DoctorConviction(BaseModel):

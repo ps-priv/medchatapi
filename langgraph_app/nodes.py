@@ -415,134 +415,185 @@ Użyj ich jako wiedzy bazowej przy ocenie twierdzeń przedstawiciela — ale TYL
 """
 
 
-def _build_system_prompt(state: ConversationState) -> str:
-    """Buduje czysty, naturalny prompt systemowy lekarza."""
+def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
+    """Buduje prompt systemowy lekarza — 3 sekcje: KIM JESTEŚ / CO ROBISZ / BEZPIECZNIKI."""
     doctor = state.get("doctor_profile", {})
     traits = state.get("traits", {})
     message_analysis = state.get("current_analysis", {})
     claim_check = state.get("current_claim_check", {})
-    turn_metrics = state.get("current_turn_metrics", {})
     coverage_summary = state.get("current_coverage_summary", {})
     style_runtime = state.get("current_style_runtime", {})
     behavior_directives = state.get("current_behavior_directives", [])
-    preferred_strategies = state.get("preferred_strategies", [])
     random_event = state.get("current_random_event")
     intent_revealed = bool(state.get("intent_revealed", False))
     drug_revealed = bool(state.get("drug_revealed", False))
-
-    random_event_line = (
-        "brak" if not random_event
-        else f"{random_event['event_name']}: {random_event['event_details']}"
-    )
-
     wrong_drug_suspected = bool(state.get("wrong_drug_suspected", False))
 
-    # --- Sekcja wiedzy o leku — tylko gdy cel wizyty jest już ujawniony ---
-    if wrong_drug_suspected and not drug_revealed:
-        drug_section = ""
-        claim_section = ""
-        rag_section = ""
-        phase_objective = "Rozmówca mówi o leku, który nie jest w obszarze Twoich zainteresowań. Wyraź brak zainteresowania tym lekiem."
-        visitor_context = "WAŻNE: Rozmówca przedstawia lek, o którym nie masz wiedzy i którym nie jesteś zainteresowana. Nie masz czasu na dyskusję o leku spoza swojego obszaru zainteresowań. Powiedz wyraźnie, że nie jesteś zainteresowana tym preparatem i zasugeruj zakończenie wizyty."
-    elif not intent_revealed:
-        drug_section = ""
-        claim_section = ""
-        rag_section = ""
-        phase_objective = "Do gabinetu weszła osoba — nie wiesz jeszcze kim jest ani po co przyszła. Zapytaj uprzejmie w czym możesz pomóc. Nie sugeruj żadnego tematu rozmowy."
-        visitor_context = "WAŻNE: Nie wiesz kim jest ta osoba — może to pacjent, student, kolega, przedstawiciel handlowy lub ktoś inny. Nie zakładaj z góry żadnej roli ani tematu wizyty."
-    elif not drug_revealed:
-        drug_section = "Rozmówca ujawnił, że ma cel medyczny/zawodowy, ale nie podał jeszcze konkretnego tematu.\n"
-        claim_section = ""
-        rag_section = ""
-        phase_objective = "Rozmówca ujawnił cel wizyty o charakterze medycznym, ale nie podał tematu. Zapytaj o szczegóły."
-        visitor_context = ""
-    else:
-        drug_knowledge = "Znasz tylko informacje podane przez rozmówcę w tej rozmowie. Własną wiedzę przytaczaj wyłącznie jako zasłyszaną opinię."
-        claim_view = {
-            "false_count": len(claim_check.get("false_claims", [])),
-            "unsupported_count": len(claim_check.get("unsupported_claims", [])),
-            "supported_count": len(claim_check.get("supported_claims", [])),
-            "coverage_critical": f"{coverage_summary.get('covered_critical', 0)}/{coverage_summary.get('total_critical', 0)}",
-        }
-        drug_section = f"Wiedza o leku: {drug_knowledge}\n"
-        claim_section = f"Weryfikacja twierdzeń: {json.dumps(claim_view, ensure_ascii=False)}\nPokrycie claimów krytycznych: {coverage_summary.get('covered_critical', 0)}/{coverage_summary.get('total_critical', 0)}\n"
-        rag_section = _rag_section(state)
-        phase_objective = PHASE_OBJECTIVES.get(state.get("phase", "opening"), "")
-        visitor_context = ""
+    # Konfiguracja sesji (Etap 1)
+    familiarity = str(state.get("familiarity", "first_meeting"))
+    register = str(state.get("register", "professional"))
+    warmth = str(state.get("warmth", "neutral"))
+    rep_name = (state.get("rep_name") or "").strip()
+    prior_visits_summary = (state.get("prior_visits_summary") or "").strip()
 
-    # --- Zasady kontekstowe ---
-    if not intent_revealed:
-        rules = """Zasady:
-1. Odpowiadaj wyłącznie po polsku.
-2. Nie wiesz z kim rozmawiasz ani po co ta osoba przyszła — nie sugeruj żadnego tematu.
-3. Zareaguj naturalnie i krótko zapytaj w czym możesz pomóc.
-4. Na próby korupcji reaguj stanowczo i zakończ rozmowę.
-5. Jeśli rozmówca używa niepoprawnej formy grzecznościowej, skoryguj go.
-6. W doctor_attitude użyj: happy, neutral, serious, sad.
-7. W doctor_decision użyj: undecided (dopóki nie poznasz celu wizyty).
-8. Nigdy nie przedstawiaj się słowami "Jestem pani doktor". Reaguj naturalnie."""
-    else:
-        rules = """Zasady:
-1. Odpowiadaj wyłącznie po polsku.
-2. MAKSYMALNIE JEDNO PYTANIE na odpowiedź. Jeśli masz kilka kwestii do wyjaśnienia, wybierz najważniejszą i zapytaj tylko o nią.
-3. Trzymaj rozmowę przy temacie wizyty: wskazania, przeciwwskazania, działania niepożądane, dawkowanie.
-4. Jeśli rozmówca poda niezgodne informacje, wpisz to do detected_errors i obniż openness.
-5. Na próby korupcji reaguj stanowczo i zakończ rozmowę.
-6. Na slogany i anglicyzmy reaguj krytycznie i proś o jeden konkretny fakt.
-7. Aktywnie stosuj styl komunikacji, cechy psychologiczne i strategie lekarza.
-8. Jeśli to końcowa faza budżetu tur, zamknij rozmowę.
-9. Jeśli rozmówca używa niepoprawnej formy grzecznościowej, skoryguj go.
-10. Jeśli brakuje claimów krytycznych, zadaj jedno celne pytanie uzupełniające — nie wyliczankę.
-11. W doctor_attitude użyj: happy, neutral, serious, sad.
-12. Tryb evidence-first: nie akceptuj tez bez danych — zapytaj o jedno konkretne potwierdzenie.
-13. W doctor_decision użyj: undecided, trial_use, will_prescribe, recommend, reject.
-14. Własną wiedzę o leku przytaczaj wyłącznie jako zasłyszaną opinię (np. "Słyszałam od koleżanki, że..."). Nigdy jako potwierdzone fakty.
-15. Nigdy nie przedstawiaj się słowami "Jestem pani doktor". Reaguj naturalnie."""
-
-    # --- Sekcja conviction — pokazuje lekarzowi jego wewnętrzny stan (Etap 2) ---
+    # Conviction (Etap 2)
     conviction = state.get("conviction", {})
-    conviction_section = ""
+
+    # Agenda (Etap 3)
+    doctor_agenda = state.get("doctor_agenda", [])
+
+    # ----------------------------------------------------------------
+    # Sekcja A — KIM JESTEŚ
+    # ----------------------------------------------------------------
+
+    rep_ref = f" {rep_name}" if rep_name else ""
+    if familiarity == "first_meeting":
+        familiarity_line = "Kontekst relacji: to pierwsza wizyta tej osoby — nie znasz jej."
+    elif familiarity == "acquainted":
+        familiarity_line = f"Kontekst relacji: znasz tę osobę{rep_ref} z poprzednich wizyt zawodowych."
+        if prior_visits_summary:
+            familiarity_line += f" {prior_visits_summary}"
+    else:
+        familiarity_line = f"Kontekst relacji: dobrze znasz tę osobę{rep_ref}, macie swobodną roboczą relację."
+        if prior_visits_summary:
+            familiarity_line += f" {prior_visits_summary}"
+
+    if register == "informal":
+        style_line = f"Komunikacja: jesteście na 'ty'.{(' Imię rozmówcy: ' + rep_name + '.') if rep_name else ''}"
+    elif register == "formal":
+        style_line = "Komunikacja: bardzo oficjalnie — 'Pan/Pani Doktor'."
+    else:
+        warmth_note = {"cool": " Rzeczowo, bez ekstra ciepła.", "warm": " Możesz być serdeczny.", "neutral": ""}.get(warmth, "")
+        style_line = f"Komunikacja: rejestr zawodowy — 'Pan/Pani Doktor'.{warmth_note}"
+
+    conviction_block = ""
     if intent_revealed and conviction:
         il = float(conviction.get("interest_level", 0.3))
         tr = float(conviction.get("trust_in_rep", 0.3))
         cc = float(conviction.get("clinical_confidence", 0.2))
         pf = float(conviction.get("perceived_fit", 0.2))
         dr = float(conviction.get("decision_readiness", 0.0))
-        conviction_section = f"""
-Twój wewnętrzny stan przekonań co do tej rozmowy (0.0 = brak, 1.0 = pełna pewność):
-- Zainteresowanie tematem: {il:.2f}
-- Zaufanie do rozmówcy: {tr:.2f}
-- Zrozumienie leku: {cc:.2f}
-- Dopasowanie do moich pacjentów: {pf:.2f}
-- Gotowość do decyzji: {dr:.2f}
-Wskazówka: jeśli średnia pierwszych czterech >= 0.65 i gotowość >= 0.75 — możesz rozważyć przepisanie. Jeśli zaufanie < 0.25 — odrzucasz propozycję.
-"""
+        conviction_block = (
+            f"\nTwój wewnętrzny stan przekonań (0.0–1.0):\n"
+            f"  zainteresowanie={il:.2f} | zaufanie={tr:.2f} | "
+            f"pewność_kliniczna={cc:.2f} | dopasowanie={pf:.2f} | gotowość_decyzji={dr:.2f}"
+        )
 
-    return f"""Jesteś lekarzem. Profil: {doctor.get('name', '')} ({doctor.get('description', '')})
-Kontekst sytuacyjny: {doctor.get('context_str', doctor.get('description', ''))}
-Płeć lekarza: {message_analysis.get('doctor_gender', 'female')}. Oczekiwana forma zwracania się: {message_analysis.get('expected_address', 'pani doktor')}.
-Poziom trudności rozmowy: {state.get('difficulty', 'medium')}.
-Preferowane strategie lekarza: {json.dumps(preferred_strategies, ensure_ascii=False)}.
-Styl komunikacji: {doctor.get('communication_style', 'profesjonalny')}
-Aktualne cechy psychologiczne: {json.dumps(traits, ensure_ascii=False)}
-Aktualna faza rozmowy: {state.get('phase', 'opening')}
-Cel bieżącej fazy: {phase_objective}
-Numer tury: {state.get('turn_index', 0)}
-Budżet rozmowy: maksymalnie {state.get('max_turns', 10)} tur, pozostało {style_runtime.get('remaining_turns', 5)} tur.
-Frustracja lekarza (0-10): {state.get('frustration_score', 0.0)}
-Zdarzenie losowe tej tury: {random_event_line}
-{visitor_context}
-{drug_section}{rag_section}{claim_section}{conviction_section}
-Wykryte sygnały w ostatniej wypowiedzi:
-{json.dumps(message_analysis, ensure_ascii=False)}
-Metryki tej tury:
-{json.dumps(turn_metrics, ensure_ascii=False)}
+    agenda_block = ""
+    if doctor_agenda:
+        lines = "\n".join(f"  [{item['kind']}] {item['content']}" for item in doctor_agenda)
+        agenda_block = f"\nTwoje wątki na tę rozmowę (wpleć naturalnie gdy pasuje):\n{lines}"
 
-Dodatkowe dyrektywy:
-{json.dumps(behavior_directives, ensure_ascii=False)}
+    section_a = (
+        f"=== KIM JESTEŚ ===\n"
+        f"Jesteś {doctor.get('name', 'lekarzem')}. {doctor.get('context_str', doctor.get('description', ''))}\n"
+        f"Styl: {doctor.get('communication_style', 'profesjonalny')} | "
+        f"Płeć: {message_analysis.get('doctor_gender', 'female')} | "
+        f"Trudność rozmowy: {state.get('difficulty', 'medium')}\n"
+        f"Cechy: sceptycyzm={traits.get('skepticism', 0.5):.2f} | "
+        f"cierpliwość={traits.get('patience', 0.5):.2f} | "
+        f"otwartość={traits.get('openness', 0.5):.2f} | "
+        f"ego={traits.get('ego', 0.5):.2f} | "
+        f"presja_czasu={traits.get('time_pressure', 0.5):.2f}\n"
+        f"{familiarity_line}\n"
+        f"{style_line}"
+        f"{conviction_block}"
+        f"{agenda_block}"
+    )
 
-{rules}
-"""
+    # ----------------------------------------------------------------
+    # Sekcja z wiedzą o leku (warunkowa)
+    # ----------------------------------------------------------------
+
+    if wrong_drug_suspected and not drug_revealed:
+        drug_block = ""
+        phase_objective = "Rozmówca mówi o leku spoza Twoich zainteresowań. Wyraź brak zainteresowania i zasugeruj zakończenie wizyty."
+        situation_note = "Rozmówca przedstawia lek którego nie znasz i który Cię nie interesuje. Powiedz to wprost i krótko."
+    elif not intent_revealed:
+        drug_block = ""
+        phase_objective = "Do gabinetu weszła osoba — nie wiesz kim jest. Zapytaj krótko w czym możesz pomóc."
+        situation_note = "Nie wiesz kim jest ta osoba — może to pacjent, student, kolega lub przedstawiciel. Nie sugeruj żadnego tematu."
+    elif not drug_revealed:
+        drug_block = "Rozmówca ujawnił cel zawodowy, ale nie podał jeszcze konkretnego tematu.\n"
+        phase_objective = "Zapytaj o szczegóły celu wizyty."
+        situation_note = ""
+    else:
+        claim_view = {
+            "potwierdzone": len(claim_check.get("supported_claims", [])),
+            "fałszywe": len(claim_check.get("false_claims", [])),
+            "niepotwierdzone": len(claim_check.get("unsupported_claims", [])),
+            "pokrycie_krytycznych": f"{coverage_summary.get('covered_critical', 0)}/{coverage_summary.get('total_critical', 0)}",
+        }
+        drug_block = (
+            f"Wiedza o leku: znasz tylko to co powiedział rozmówca. "
+            f"Własną wiedzę cytuj jako zasłyszaną opinię.\n"
+            f"Weryfikacja twierdzeń: {json.dumps(claim_view, ensure_ascii=False)}\n"
+            f"{_rag_section(state)}"
+        )
+        phase_objective = PHASE_OBJECTIVES.get(state.get("phase", "opening"), "")
+        situation_note = ""
+
+    # ----------------------------------------------------------------
+    # Sekcja B — CO ROBISZ W TEJ TURZE
+    # ----------------------------------------------------------------
+
+    turn_line = (
+        f"Tura {state.get('turn_index', 0)}/{state.get('max_turns', 10)} | "
+        f"Faza: {state.get('phase', 'opening')} | "
+        f"Frustracja: {state.get('frustration_score', 0.0):.1f}/10 | "
+        f"Pozostało: {style_runtime.get('remaining_turns', 5)} tur"
+    )
+    if random_event:
+        turn_line += f"\nZdarzenie: {random_event['event_name']} — {random_event['event_details']}"
+
+    top_directives = behavior_directives[:2]
+    directives_text = (
+        "\n".join(f"  • {d}" for d in top_directives)
+        if top_directives else "  • Reaguj naturalnie."
+    )
+
+    section_b = (
+        f"=== CO ROBISZ W TEJ TURZE ===\n"
+        f"{turn_line}\n"
+        f"Cel fazy: {phase_objective}\n"
+        + (f"{situation_note}\n" if situation_note else "")
+        + f"Dyrektywy:\n{directives_text}"
+    )
+
+    # ----------------------------------------------------------------
+    # Sekcja C — TWARDE BEZPIECZNIKI
+    # ----------------------------------------------------------------
+
+    if register == "informal":
+        form_rule = "Jesteście na 'ty' — nie koryguj formy grzecznościowej."
+    else:
+        form_rule = f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj błędy grzecznościowe."
+
+    if conviction:
+        tr = float(conviction.get("trust_in_rep", 0.3))
+        dr = float(conviction.get("decision_readiness", 0.0))
+        if tr < 0.25:
+            conviction_rule = "Zaufanie krytycznie niskie — zmierzasz do odrzucenia propozycji."
+        elif dr >= 0.75:
+            conviction_rule = "Gotowość decyzji wysoka — możesz zasygnalizować decyzję."
+        else:
+            conviction_rule = f"Decyzja wynika z conviction (zaufanie={tr:.2f}, gotowość={dr:.2f})."
+    else:
+        conviction_rule = "Decyzja: undecided dopóki nie masz podstaw."
+
+    section_c = (
+        f"=== TWARDE BEZPIECZNIKI ===\n"
+        f"1. Odpowiadaj wyłącznie po polsku.\n"
+        f"2. Korupcja lub niestosowna propozycja → zakończ rozmowę natychmiast.\n"
+        f"3. {form_rule}\n"
+        f"4. Liczby i dane leku: cytuj tylko jako zasłyszaną opinię ('Słyszałam od koleżanki...'), nigdy jako własne fakty.\n"
+        f"5. {conviction_rule}\n"
+        f"6. doctor_decision: undecided | trial_use | will_prescribe | recommend | reject\n"
+        f"7. doctor_attitude: happy | neutral | serious | sad\n"
+        f"8. Nigdy nie mów 'Jestem pani/pan doktor' — reaguj naturalnie."
+    )
+
+    return f"{section_a}\n\n{section_b}\n{drug_block}\n{section_c}\n"
 
 
 def node_generate_response(state: ConversationState, config: RunnableConfig) -> Dict:
@@ -630,10 +681,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         message_analysis=message_analysis,
         claim_check=claim_check,
         phase=state.get("phase", "opening"),
-        missing_critical_labels=missing_labels,
-        evidence_requirements=evidence_reqs,
-        drug_revealed=bool(state.get("drug_revealed", False)),
-        intent_revealed=bool(state.get("intent_revealed", False)),
+        register=str(state.get("register", "professional")),
     )
 
     # --- Knowledge guard ---

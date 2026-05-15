@@ -14,6 +14,7 @@ from conversation.schemas import EvaluationResult, MessageRequest, SessionConfig
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
+from .agenda_generator import generate_agenda
 from .graph import compiled_graph
 from .helpers import build_initial_state, forced_goal_payload
 from .rag import get_rag
@@ -76,6 +77,18 @@ def start_session(
         session_id=session_id,
         session_config=session_config,
     )
+
+    # Generuj agendę lekarza (1 wywołanie LLM ~0.001 USD) — przy błędzie lista pusta
+    doctor_agenda = generate_agenda(
+        doctor_profile=doctor_profile,
+        drug_info=drug_info,
+        familiarity=state.get("familiarity", "first_meeting"),
+        prior_visits_summary=state.get("prior_visits_summary"),
+        api_key=api_key,
+        model="gpt-4o-mini",
+    )
+    state = {**state, "doctor_agenda": doctor_agenda}
+
     sessions[session_id] = state
 
     # Logujemy konfigurację - przyda się przy debugowaniu różnych scenariuszy treningowych

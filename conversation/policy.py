@@ -528,54 +528,38 @@ def policy_postprocess_message(
     message_analysis: Dict,
     claim_check: Dict,
     phase: str,
-    missing_critical_labels: List[str],
-    evidence_requirements: Dict,
-    drug_revealed: bool,
-    intent_revealed: bool,
+    register: str = "professional",
 ) -> str:
-    """Dopisuje obowiązkowe korekty policy do odpowiedzi LLM.
+    """Nakłada minimalne korekty bezpieczeństwa na odpowiedź LLM.
 
-    Korekty bezpieczeństwa (błędna forma, niestosowność, false claims) są zawsze
-    dopisywane. Pytania dodatkowe — co najwyżej jedno, i tylko gdy LLM sam
-    nie zadał żadnego pytania.
+    Zostają: limit zdań, korekta formy grzecznościowej (z uwzględnieniem rejestru),
+    granica przy niestosownych propozycjach, korekta false claims, zamknięcie fazy.
+    Usunięto: wymuszone pytania o claimy, evidence-first probe, przekierowania off-topic
+    — te mechanizmy działają teraz przez conviction i prompt systemowy.
     """
     result = limit_sentences(raw_message.strip(), int(style_runtime["max_sentences"]))
 
-    # --- Korekty bezpieczeństwa — zawsze dopisywane ---
-    if message_analysis["gender_mismatch_hits"]:
+    # Korekta formy grzecznościowej — pomijamy przy INFORMAL (ty jest z założenia poprawne)
+    if register != "informal" and message_analysis["gender_mismatch_hits"]:
         correction = f"Proszę zwracać się do mnie poprawnie: '{message_analysis['expected_address']}'."
         if correction not in result:
             result += f" {correction}"
 
+    # Granica przy niestosownych propozycjach i braku szacunku
     if message_analysis["inappropriate_hits"] or message_analysis["disrespect_hits"]:
         boundary_msg = "Taki ton i takie propozycje są nieakceptowalne w rozmowie zawodowej."
         if boundary_msg not in result:
             result += f" {boundary_msg}"
 
-    if message_analysis["off_topic_hits"] and not message_analysis["has_drug_focus"]:
-        redirect = "Proszę wrócić do tematu wizyty." if intent_revealed else "Proszę przejść do celu spotkania."
-        if redirect not in result:
-            result += f" {redirect}"
-
+    # Twarda korekta false claims
     if claim_check["false_claims"]:
         if "niezgodne z danymi" not in result:
             result += " To niezgodne z danymi leku."
 
+    # Zamknięcie fazy — tylko gdy lekarz sam nie zasygnalizował końca
     if phase == "close":
         if "Kończę" not in result and "kończę" not in result and "zakończ" not in result:
             result += " Na tym etapie kończę spotkanie."
-
-    # --- Pytanie uzupełniające — co najwyżej jedno, tylko gdy LLM nie zadał żadnego ---
-    if phase != "close" and "?" not in result:
-        followup = str(evidence_requirements.get("followup_question", "")).strip()
-        if followup:
-            result += f" {followup}"
-        elif missing_critical_labels:
-            result += " Proszę odnieść się do kluczowych danych klinicznych leku."
-        elif not intent_revealed:
-            result += " W czym mogę pomóc?"
-        elif not drug_revealed:
-            result += " Proszę powiedzieć, czego dokładnie dotyczy wizyta."
 
     return result.strip()
 
