@@ -1,0 +1,117 @@
+[
+  {
+    "id": "noacid",
+    "nazwa": "Noacid, 20 mg, tabletki dojelitowe",
+    "skład": "Pantoprazolum 20 mg",
+    "wskazania": "Noacid jest wskazany do leczenia objawowej postaci choroby refluksowej przełyku u dorosłych i młodzieży w wieku 12 lat i powyżej. Stosowany jest również w długotrwałym leczeniu i zapobieganiu nawrotom refluksowego zapalenia przełyku oraz w zapobieganiu owrzodzeniom żołądka i dwunastnicy wywołanym przez NLPZ u pacjentów z grupy zwiększonego ryzyka.",
+    "przeciwwskazania": "Noacid jest przeciwwskazany u pacjentów z nadwrażliwością na pantoprazol, podstawione benzoimidazole, soję lub inne substancje pomocnicze. Nie należy go stosować u dzieci poniżej 12 lat.",
+    "działania_niepożądane": "Długotrwałe stosowanie pantoprazolu może prowadzić do hipomagnezemii oraz zwiększać ryzyko złamań kości. Może również wpływać na wchłanianie witaminy B12.",
+    "dawkowanie": "Zalecana dawka dla dorosłych i młodzieży w wieku 12 lat i powyżej to 1 tabletka Noacid 20 mg raz na dobę. W przypadku długotrwałego leczenia dawkę można zwiększyć do 40 mg na dobę.",
+    "claims": [
+      {
+        "id": "noacid_contraindications",
+        "type": "contraindication",
+        "severity": "critical",
+        "statement": "Noacid jest przeciwwskazany u pacjentów z nadwrażliwością na pantoprazol lub soję.",
+        "keywords": [
+          "przeciwwskazania",
+          "nadwrazliwosc",
+          "soja"
+        ],
+        "numbers": null,
+        "support_patterns": [
+          "nadwrazliwosc na substancje czynna",
+          "nadwrazliwosc na soje"
+        ],
+        "contradiction_patterns": [
+          "brak przeciwwskazan",
+          "mozna stosowac u wszystkich"
+        ]
+      },
+      {
+        "id": "noacid_side_effects",
+        "type": "side_effect",
+        "severity": "major",
+        "statement": "Długotrwałe stosowanie Noacid może prowadzić do hipomagnezemii.",
+        "keywords": [
+          "dzialania niepozadane",
+          "hipomagnezemia"
+        ],
+        "numbers": null,
+        "support_patterns": [
+          "ciezka hipomagnezemia",
+          "dlugotrwale stosowanie"
+        ],
+        "contradiction_patterns": [
+          "brak dzialan niepozadanych",
+          "bezpieczny przy dlugotrwalym stosowaniu"
+        ]
+      },
+      {
+        "id": "noacid_dosage",
+        "type": "dosage",
+        "severity": "major",
+        "statement": "Standardowe dawkowanie Noacid to 20 mg raz na dobę.",
+        "keywords": [
+          "dawkowanie",
+          "mg",
+          "standardowe"
+        ],
+        "numbers": [
+          20
+        ],
+        "support_patterns": [
+          "20 mg raz na dobe",
+          "standardowe dawkowanie"
+        ],
+        "contradiction_patterns": [
+          "dowolna dawka",
+          "bez ograniczen"
+        ]
+      },
+      {
+        "id": "noacid_indication",
+        "type": "indication",
+        "severity": "major",
+        "statement": "Noacid jest wskazany do leczenia refluksowego zapalenia przełyku.",
+        "keywords": [
+          "wskazania",
+          "refluks",
+          "zapalenie"
+        ],
+        "numbers": null,
+        "support_patterns": [
+          "refluksowe zapalenie przelyku",
+          "leczenie refluksu"
+        ],
+        "contradiction_patterns": [
+          "brak wskazan",
+          "nie stosowac w refluksie"
+        ]
+      },
+      {
+        "id": "noacid_efficacy",
+        "type": "efficacy",
+        "severity": "critical",
+        "statement": "Noacid skutecznie redukuje objawy refluksu w ciągu 2-4 tygodni.",
+        "keywords": [
+          "skutecznosc",
+          "redukcja",
+          "refluks"
+        ],
+        "numbers": [
+          2,
+          4
+        ],
+        "support_patterns": [
+          "objawy ustepuja po 2-4 tygodniach",
+          "skuteczna redukcja objawow"
+        ],
+        "contradiction_patterns": [
+          "brak skutecznosci",
+          "nie redukuje objawow"
+        ]
+      }
+    ]
+  }
+]

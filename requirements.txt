@@ -1,0 +1,24 @@
+fastapi
+uvicorn
+pydantic
+openai
+python-multipart
+
+# LangGraph + LangChain
+langgraph
+langchain
+langchain-openai
+langchain-community
+langchain-chroma
+langchain-text-splitters
+
+# Vector store
+chromadb
+
+# PDF/DOCX ingestion (używane przez drug_ingest.py, nie przez API)
+pypdf
+python-docx
+docx2txt
+
+# Supabase
+supabase
