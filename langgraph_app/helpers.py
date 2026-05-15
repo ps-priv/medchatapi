@@ -448,16 +448,16 @@ def derive_decision_from_conviction(conviction: Dict[str, float], state: Convers
 
     avg_positive = (interest + trust + clinical + fit) / 4
 
-    # Rekomendacja innemu lekarzowi (wysoki trust + dobra znajomość kliniczna)
-    if trust >= 0.75 and clinical >= 0.70 and readiness >= 0.65:
-        return "recommend"
-
     # Pełna decyzja o przepisaniu
-    if avg_positive >= 0.65 and readiness >= 0.75:
+    if avg_positive >= 0.60 and readiness >= 0.65:
         return "will_prescribe"
 
-    # Próbne zastosowanie
-    if avg_positive >= 0.55 and readiness >= 0.60:
+    # Rekomendacja innemu lekarzowi (wysoki trust + dobra znajomość kliniczna)
+    if trust >= 0.70 and clinical >= 0.65 and readiness >= 0.60:
+        return "recommend"
+
+    # Próbne zastosowanie — obniżone progi: było 0.55/0.60
+    if avg_positive >= 0.50 and readiness >= 0.50:
         return "trial_use"
 
     return "undecided"

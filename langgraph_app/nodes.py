@@ -819,10 +819,20 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     turn_modes_history = list(state.get("turn_modes_history", []))
     turn_modes_history.append(str(state.get("current_turn_mode", "REACT")))
 
+    # Oznacz pierwszy niezużyty wątek agendy jako użyty po SHARE lub DRIFT
+    current_turn_mode = str(state.get("current_turn_mode", "REACT"))
+    doctor_agenda = list(state.get("doctor_agenda", []))
+    if current_turn_mode in ("SHARE", "DRIFT"):
+        for i, item in enumerate(doctor_agenda):
+            if not item.get("used"):
+                doctor_agenda[i] = {**item, "used": True}
+                break
+
     return {
         "messages": new_messages,
         "traits": updated_traits,
         "conviction": new_conviction,
+        "doctor_agenda": doctor_agenda,
         "turn_modes_history": turn_modes_history,
         "is_terminated": is_terminated,
         "phase": "close" if is_terminated else state.get("phase", "opening"),

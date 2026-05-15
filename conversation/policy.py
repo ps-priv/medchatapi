@@ -681,14 +681,16 @@ def update_conviction(
     if "confrontational" in strategies:
         trust_gain_mult *= 0.80   # trudniejszy w budowaniu relacji
 
-    # --- Claimy potwierdzone → wzrost pewności klinicznej i gotowości ---
+    # --- Claimy potwierdzone → wzrost pewności klinicznej, gotowości i dopasowania ---
     supported = len(claim_check.get("supported_claims", []))
     if supported:
         c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.08 * min(supported, 3) * clinical_gain_mult)
-        readiness_gain = 0.05 * min(supported, 3)
+        readiness_gain = 0.07 * min(supported, 3)  # było 0.05 — przyspieszone budowanie gotowości
         if "transactional" in strategies:
-            readiness_gain *= 1.25  # pragmatyk szybciej decyduje gdy dane się zgadzają
+            readiness_gain *= 1.25
         c["decision_readiness"] = clamp01(c["decision_readiness"] + readiness_gain)
+        # Każdy potwierdzony claim to dowód że lek pasuje do pacjentów lekarza
+        c["perceived_fit"] = clamp01(c["perceived_fit"] + 0.02 * min(supported, 2))
 
     # --- Claimy fałszywe → strata zaufania i pewności (zależna od severity) ---
     has_false = bool(claim_check.get("false_claims"))
@@ -761,17 +763,30 @@ def update_conviction(
     if message_analysis.get("bribery_hits"):
         c["trust_in_rep"] = 0.0
 
-    # --- Pokrycie claimów krytycznych >= 80% → wzrost dopasowania i gotowości ---
-    if float(turn_metrics.get("critical_claim_coverage", 0.0)) >= 0.8:
-        c["perceived_fit"] = clamp01(c["perceived_fit"] + 0.10)
+    # --- Pokrycie claimów krytycznych: progresywne progi ---
+    critical_coverage = float(turn_metrics.get("critical_claim_coverage", 0.0))
+    if critical_coverage >= 0.5:
+        # Już przy 50% pokryciu lekarz zaczyna widzieć dopasowanie leku
+        c["perceived_fit"] = clamp01(c["perceived_fit"] + 0.06)
+    if critical_coverage >= 0.8:
+        # Pełne pokrycie → gotowość decyzyjna
         dr_gain = 0.10
         if "skeptical" in strategies:
-            dr_gain *= 0.80  # sceptyk wolniej przechodzi do decyzji nawet przy dobrym pokryciu
+            dr_gain *= 0.80
         c["decision_readiness"] = clamp01(c["decision_readiness"] + dr_gain)
 
-    # --- Dobra adherencja tematu → lekki wzrost zainteresowania ---
-    if float(turn_metrics.get("topic_adherence", 0.0)) >= 0.7:
+    # --- Dobra adherencja tematu → zainteresowanie, dopasowanie i drobna gotowość ---
+    topic_adherence = float(turn_metrics.get("topic_adherence", 0.0))
+    if topic_adherence >= 0.7:
         c["interest_level"] = clamp01(c["interest_level"] + 0.03 * interest_gain_mult)
+        c["perceived_fit"] = clamp01(c["perceived_fit"] + 0.03)
+        c["decision_readiness"] = clamp01(c["decision_readiness"] + 0.02)
+
+    # --- Pasywny carry-over: rosnąca pewność kliniczna buduje gotowość decyzyjną ---
+    # Im więcej lekarz rozumie lek, tym bardziej jest gotów do decyzji
+    cc_above = max(0.0, c["clinical_confidence"] - 0.40)
+    if cc_above > 0:
+        c["decision_readiness"] = clamp01(c["decision_readiness"] + round(0.04 * cc_above, 4))
 
     # --- Wysoka frustracja → spadek zainteresowania i gotowości ---
     if frustration_score >= 6.0:
