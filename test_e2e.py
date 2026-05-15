@@ -17,10 +17,15 @@ DRUG   = sys.argv[2] if len(sys.argv) > 2 else "noacid"
 
 TURNS = [
     "Dzień dobry, jestem przedstawicielem firmy PharmaX.",
-    "Chciałbym omówić lek Noacid — nowoczesny inhibitor pompy protonowej.",
-    "W badaniu klinicznym na 1200 pacjentach Noacid wykazał skuteczność 89% w gojeniu nadżerek.",
-    "Lek jest wskazany przy refluksie i chorobie wrzodowej żołądka. Profil bezpieczeństwa jest bardzo dobry.",
-    "Czy rozważyłaby Pani przepisanie go pacjentom z przewlekłym refluksem?",
+    "Chciałbym omówić Noacid — inhibitor pompy protonowej wskazany do leczenia refluksowego zapalenia przełyku.",
+    "W badaniu klinicznym Noacid skutecznie redukuje objawy refluksu w ciągu 2-4 tygodni. Dawkowanie to 20 mg raz na dobę.",
+    "Noacid jest wskazany w długotrwałym leczeniu i zapobieganiu nawrotom refluksowego zapalenia przełyku.",
+    "W zakresie bezpieczeństwa: Noacid jest przeciwwskazany u pacjentów z nadwrażliwością na pantoprazol lub soję.",
+    "W badaniu na 800 pacjentach z NLPZ, Noacid skutecznie zapobiegał owrzodzeniom żołądka i dwunastnicy.",
+    "Przy długotrwałym stosowaniu warto monitorować poziom magnezu — ryzyko hipomagnezemii jest znane i zarządzalne.",
+    "Podsumowując: Noacid łączy skuteczność 20 mg/dobę z dobrym profilem bezpieczeństwa i szerokim zakresem wskazań.",
+    "Czy widzi Pani pacjentów z przewlekłym refluksem lub na NLPZ, którym Noacid mógłby pomóc?",
+    "Czy rozważyłaby Pani włączenie Noacid do swojej praktyki jako opcji dla tych pacjentów?",
 ]
 
 
