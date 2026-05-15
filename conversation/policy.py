@@ -681,10 +681,14 @@ def update_conviction(
     if "confrontational" in strategies:
         trust_gain_mult *= 0.80   # trudniejszy w budowaniu relacji
 
+    # Malejące zwroty dla clinical_confidence: im wyższa pewność, tym trudniej ją dalej podnosić
+    # Krzywa logarytmyczna: przy cc=0.0 → pełny gain; przy cc=1.0 → 40% gain
+    cc_factor = max(0.40, 1.0 - c["clinical_confidence"] * 0.70)
+
     # --- Claimy potwierdzone → wzrost pewności klinicznej, gotowości i dopasowania ---
     supported = len(claim_check.get("supported_claims", []))
     if supported:
-        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.08 * min(supported, 3) * clinical_gain_mult)
+        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.08 * min(supported, 3) * clinical_gain_mult * cc_factor)
         readiness_gain = 0.07 * min(supported, 3)  # było 0.05 — przyspieszone budowanie gotowości
         if "transactional" in strategies:
             readiness_gain *= 1.25
@@ -723,10 +727,10 @@ def update_conviction(
     evidence_count = min(len(message_analysis.get("evidence_hits", [])), 2)
     study_count = min(len(message_analysis.get("clinical_study_hits", [])), 2)
     if evidence_count:
-        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.10 * evidence_count * clinical_gain_mult)
+        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.10 * evidence_count * clinical_gain_mult * cc_factor)
         c["interest_level"] = clamp01(c["interest_level"] + 0.05 * evidence_count * interest_gain_mult)
     if study_count:
-        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.06 * study_count * clinical_gain_mult)
+        c["clinical_confidence"] = clamp01(c["clinical_confidence"] + 0.06 * study_count * clinical_gain_mult * cc_factor)
         interest_study_gain = 0.03 * study_count * interest_gain_mult
         if "exploratory" in strategies:
             interest_study_gain *= 1.30  # ciekawy lekarz bardziej reaguje na badania
@@ -763,6 +767,20 @@ def update_conviction(
     if message_analysis.get("bribery_hits"):
         c["trust_in_rep"] = 0.0
 
+    # --- Wzrost zaufania z rzetelnego i kompetentnego zachowania ---
+    # Zaufanie rośnie wyłącznie gdy nie ma kłamstw ani manipulacji
+    topic_adherence = float(turn_metrics.get("topic_adherence", 0.0))
+    if not has_false and not marketing_count and not message_analysis.get("bribery_hits"):
+        # Potwierdzone claimy → kompetencja zawodowa
+        if supported:
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.010 * min(supported, 2) * trust_gain_mult)
+        # Dane i badania → wiarygodność merytoryczna
+        if evidence_count:
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.010 * evidence_count * trust_gain_mult)
+        # Czysta, tematyczna tura bez błędów → spójność i profesjonalizm
+        if not english_count and not message_analysis.get("inappropriate_hits") and topic_adherence >= 0.7:
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.012 * trust_gain_mult)
+
     # --- Pokrycie claimów krytycznych: progresywne progi ---
     critical_coverage = float(turn_metrics.get("critical_claim_coverage", 0.0))
     if critical_coverage >= 0.5:
@@ -776,7 +794,6 @@ def update_conviction(
         c["decision_readiness"] = clamp01(c["decision_readiness"] + dr_gain)
 
     # --- Dobra adherencja tematu → zainteresowanie, dopasowanie i drobna gotowość ---
-    topic_adherence = float(turn_metrics.get("topic_adherence", 0.0))
     if topic_adherence >= 0.7:
         c["interest_level"] = clamp01(c["interest_level"] + 0.03 * interest_gain_mult)
         c["perceived_fit"] = clamp01(c["perceived_fit"] + 0.03)

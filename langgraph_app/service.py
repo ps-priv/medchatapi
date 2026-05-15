@@ -234,6 +234,9 @@ def finish_session(session_id: str, api_key: str, model: str) -> Dict:
         history_list.append({"speaker": speaker, "text": content})
         history_text += f"[{speaker}]: {content}\n"
 
+    final_conviction = state.get("conviction", {})
+    final_decision = state.get("current_doctor_decision", "undecided")
+
     evaluator_prompt = f"""
 Jesteś doświadczonym trenerem sprzedaży medycznej.
 
@@ -251,12 +254,21 @@ Metryki i przebieg algorytmu:
 Ostatnia faza rozmowy: {state.get('phase', 'unknown')}
 Końcowy poziom frustracji lekarza (0-10): {state.get('frustration_score', 'unknown')}
 
+Finalny stan przekonań lekarza (conviction, skala 0-1):
+- zainteresowanie: {final_conviction.get('interest_level', 0):.2f}
+- zaufanie do przedstawiciela: {final_conviction.get('trust_in_rep', 0):.2f}
+- pewność kliniczna co do leku: {final_conviction.get('clinical_confidence', 0):.2f}
+- dopasowanie leku do pacjentów: {final_conviction.get('perceived_fit', 0):.2f}
+- gotowość do decyzji: {final_conviction.get('decision_readiness', 0):.2f}
+Decyzja lekarza: {final_decision}
+
 Oceń przedstawiciela pod kątem:
 - profesjonalizmu,
 - trafności argumentów dot. leku,
 - budowania relacji i radzenia sobie z trudnym lekarzem,
 - utrzymania rozmowy w temacie leku,
 - zgodności etycznej (bez prób niedozwolonych korzyści).
+Uwzględnij conviction i decyzję lekarza jako główny sygnał skuteczności rozmowy.
 """
 
     llm = ChatOpenAI(model=model, api_key=api_key).with_structured_output(EvaluationResult)

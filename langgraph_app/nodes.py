@@ -784,6 +784,17 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     # Podmień doctor_decision w goal na conviction_decision (spójność danych w raporcie)
     conversation_goal["doctor_decision"] = conviction_decision
 
+    # Korekta spójności score ↔ conviction: jeśli conviction jest pozytywne,
+    # score musi to odzwierciedlać — inaczej feedback jest sprzeczny z decyzją
+    if conviction_decision in {"trial_use", "will_prescribe", "recommend"}:
+        if conversation_goal.get("score", 0) < 60:
+            conversation_goal["score"] = 60
+        if conversation_goal.get("status") == "not_achieved":
+            conversation_goal["status"] = "partial"
+    if conviction_decision in {"will_prescribe", "recommend"}:
+        if conversation_goal.get("score", 0) < 70:
+            conversation_goal["score"] = 70
+
     # --- Aktualizacja traits ---
     llm_traits = ai_response.updated_traits.model_dump() if ai_response else dict(state.get("traits", {}))
     updated_traits = apply_reaction_rules(
