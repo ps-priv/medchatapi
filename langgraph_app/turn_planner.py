@@ -61,13 +61,13 @@ def derive_decision_from_conviction(conviction: Dict[str, float], state: Convers
 
     avg_positive = (interest + trust + clinical + fit) / 4
 
-    if avg_positive >= 0.60 and readiness >= 0.65:
+    if avg_positive >= 0.60 and readiness >= 0.55:
         return "will_prescribe"
 
-    if trust >= 0.70 and clinical >= 0.65 and readiness >= 0.60:
+    if trust >= 0.70 and clinical >= 0.55 and readiness >= 0.50:
         return "recommend"
 
-    if avg_positive >= 0.50 and readiness >= 0.50:
+    if avg_positive >= 0.50 and readiness >= 0.25:
         return "trial_use"
 
     return "undecided"

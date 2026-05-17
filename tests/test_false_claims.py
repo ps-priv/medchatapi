@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from _common import post, fmt_conviction, fmt_metrics, assert_pass, print_header, print_separator
 
-DOCTOR = "evidence_seeker"
+DOCTOR = "academic_researcher"
 DRUG = "noacid"
 
 TURNS = [

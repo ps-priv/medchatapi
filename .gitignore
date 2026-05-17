@@ -4,3 +4,4 @@ __pycache__/
 *.pyo
 chroma_db/
 .DS_Store
+langgraph_app/__pycache__/helpers.cpython-312.pyc

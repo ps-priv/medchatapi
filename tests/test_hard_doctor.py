@@ -97,10 +97,11 @@ print("WYNIKI TESTÓW:\n")
 
 passes = []
 
-# Trudny lekarz nie powinien kończyć zbyt wcześnie (protection window działa do tury 5)
+# Protection window gwarantuje co najmniej 5 pełnych tur przed możliwym zakończeniem
+turns_completed = len(attitudes)
 passes.append(assert_pass(
-    not terminated_early or (last_resp is not None and last_resp.get("is_terminated")),
-    "Rozmowa nie zakończyła się przed turą 5 (protection window)"
+    turns_completed >= 5,
+    f"Rozmowa nie zakończyła się przed turą 5 — protection window (tur: {turns_completed})"
 ))
 
 if last_resp:

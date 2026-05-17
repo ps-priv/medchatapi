@@ -181,13 +181,16 @@ def build_initial_state(
     _trust_start = {"first_meeting": 0.20, "acquainted": 0.45, "familiar": 0.65}.get(
         session_config.familiarity.value, 0.30
     )
+    _readiness_start = {"first_meeting": 0.0, "acquainted": 0.05, "familiar": 0.15}.get(
+        session_config.familiarity.value, 0.0
+    )
     _openness = float(initial_traits.get("openness", 0.5))
     initial_conviction: Dict[str, float] = {
         "interest_level": round(max(0.10, min(0.50, 0.20 + _openness * 0.15)), 2),
         "trust_in_rep": _trust_start,
         "clinical_confidence": 0.2,
         "perceived_fit": 0.2,
-        "decision_readiness": 0.0,
+        "decision_readiness": _readiness_start,
     }
 
     return ConversationState(
