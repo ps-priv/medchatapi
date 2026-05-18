@@ -17,6 +17,7 @@ from conversation.conviction import update_conviction
 from conversation.doctor_traits import build_style_directives, clamp_traits, difficulty_profile
 from conversation.message_analysis import analyze_message
 from conversation.metrics import advance_phase, compute_frustration, compute_turn_metrics
+from conversation.keyword_triggers import apply_keyword_triggers
 from conversation.policy import (
     apply_reaction_rules,
     evidence_first_requirements,
@@ -589,6 +590,8 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         frustration_delta=float(frustration_update.get("delta", 0.0)),
         frustration_total=float(frustration_update.get("total", 0.0)),
     )
+    rep_message = str(state.get("current_user_message", ""))
+    updated_traits, _ = apply_keyword_triggers(rep_message, updated_traits)
 
     # --- Sprawdzenie zakończenia ---
     is_terminated, termination_reason = check_termination(state={**state, "traits": updated_traits}, message_analysis=message_analysis)

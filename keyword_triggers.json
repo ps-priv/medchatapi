@@ -1,0 +1,36 @@
+{
+  "triggers": [
+    {
+      "phrase": "skuteczny",
+      "match_type": "word",
+      "comment": "Podkreślenie skuteczności leku → lekarz staje się bardziej otwarty",
+      "deltas": {
+        "openness": 0.10
+      }
+    },
+    {
+      "phrase": "konkretnie",
+      "match_type": "word",
+      "comment": "Konkretna argumentacja → lekarz odczuwa mniejszą presję czasu",
+      "deltas": {
+        "time_pressure": -0.08
+      }
+    },
+    {
+      "phrase": "To dobry lek",
+      "match_type": "substring",
+      "comment": "Ogólna pochwała bez uzasadnienia → lekarz staje się bardziej sceptyczny",
+      "deltas": {
+        "skepticism": 0.12
+      }
+    },
+    {
+      "phrase": "Noacid",
+      "match_type": "substring",
+      "comment": "Wymienienie nazwy leku → lekarz wykazuje więcej cierpliwości",
+      "deltas": {
+        "patience": 0.10
+      }
+    }
+  ]
+}

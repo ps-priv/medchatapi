@@ -230,5 +230,4 @@ CLAIM_SEVERITY_WEIGHTS = {"critical": 1.6, "major": 1.0, "minor": 0.5}
 # Aby dodać nową komendę, wystarczy dopisać wpis tutaj.
 CHAT_COMMANDS: dict = {
     "Zamienić": "close_visit",
-    "Skuteczny":"increase_openness"
 }
