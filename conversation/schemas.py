@@ -71,17 +71,7 @@ class SessionConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_consistency(self) -> "SessionConfig":
-        # Reguła 1: INFORMAL wymaga FAMILIAR
-        if (
-            self.register == CommunicationRegister.INFORMAL
-            and self.familiarity != Familiarity.FAMILIAR
-        ):
-            raise ValueError(
-                "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
-                "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
-                "lekarz oczekuje formy 'Pan/Pani'."
-            )
-        # Reguła 2: prior_visits_summary tylko gdy się znają
+        # prior_visits_summary nie ma sensu przy first_meeting
         if (
             self.prior_visits_summary
             and self.familiarity == Familiarity.FIRST_MEETING
@@ -90,8 +80,6 @@ class SessionConfig(BaseModel):
                 "prior_visits_summary nie ma sensu przy first_meeting "
                 "(lekarz nie pamięta wcześniejszych wizyt z tym przedstawicielem)."
             )
-        # Reguła 3: rep_name dla relacji ciągłej (ostrzeżenie miękkie - dopuszczamy brak, ale logujemy)
-        # Nie raise - tylko walidator może to zalogować, jeśli zostanie pusty
         return self
 
     model_config = ConfigDict(

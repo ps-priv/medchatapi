@@ -30,6 +30,8 @@ from conversation.schemas import (
     TTSRequest,
     TTSResponse,
 )
+from conversation.data import get_doctor_by_id
+from conversation.schemas import CommunicationRegister, Familiarity
 from conversation.transcribe import transcribe_audio_file_request, transcribe_audio_payload
 from conversation.tts import synthesize_speech
 from langgraph_app.service import finish_session, process_message, start_session
@@ -106,13 +108,8 @@ async def start_conversation(
         try:
             data = _json.loads(raw_body)
         except _json.JSONDecodeError:
-            # Niepoprawny JSON - kompatybilność wsteczna: traktujemy jak brak body.
-            # (Dawniej taki request też nie miał body, więc nie psujemy klientów.)
             data = None
         if data:
-            # Walidacja Pydantic - rzuca ValidationError jeśli niezgodne z SessionConfig.
-            # FastAPI automatycznie zamieni to na HTTP 422 z komunikatem walidacji,
-            # co jest pożądane: klient dostaje czytelny błąd zamiast cichej akceptacji.
             try:
                 session_config = SessionConfig.model_validate(data)
             except ValidationError as exc:
@@ -123,6 +120,30 @@ async def start_conversation(
                         "errors": exc.errors(),
                     },
                 ) from exc
+
+            # INFORMAL + non-FAMILIAR: domyślnie niedozwolone (etykieta polska),
+            # chyba że archetyp lekarza jawnie dopuszcza komunikację nieformalna od razu.
+            if (
+                session_config.register == CommunicationRegister.INFORMAL
+                and session_config.familiarity != Familiarity.FAMILIAR
+            ):
+                doctor_profile = get_doctor_by_id(doctor_id)
+                if not (doctor_profile and doctor_profile.get("allows_informal", False)):
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "message": "Niepoprawna konfiguracja sesji.",
+                            "errors": [
+                                {
+                                    "msg": (
+                                        "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
+                                        "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
+                                        "lekarz oczekuje formy 'Pan/Pani'."
+                                    )
+                                }
+                            ],
+                        },
+                    )
 
     return start_session(
         doctor_id=doctor_id,
