@@ -71,15 +71,9 @@ class SessionConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_consistency(self) -> "SessionConfig":
-        # prior_visits_summary nie ma sensu przy first_meeting
-        if (
-            self.prior_visits_summary
-            and self.familiarity == Familiarity.FIRST_MEETING
-        ):
-            raise ValueError(
-                "prior_visits_summary nie ma sensu przy first_meeting "
-                "(lekarz nie pamięta wcześniejszych wizyt z tym przedstawicielem)."
-            )
+        # przy first_meeting lekarz nie pamięta poprzednich wizyt — cicho czyścimy summary
+        if self.prior_visits_summary and self.familiarity == Familiarity.FIRST_MEETING:
+            self.prior_visits_summary = None
         return self
 
     model_config = ConfigDict(
