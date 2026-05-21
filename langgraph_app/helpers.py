@@ -89,8 +89,8 @@ def check_termination(state: ConversationState, message_analysis: Dict) -> Tuple
         return False, None
 
     should_terminate = (
-        float(traits.get("patience", 0.5)) <= 0.1
-        or float(traits.get("time_pressure", 0.5)) >= 0.8
+        float(traits.get("patience", 0.5)) <= 0.08
+        or float(traits.get("time_pressure", 0.5)) >= 0.9
         or float(state.get("frustration_score", 0.0)) >= float(state.get("termination_frustration_threshold", 8.0))
         or (
             (message_analysis.get("inappropriate_hits") or message_analysis.get("disrespect_hits"))

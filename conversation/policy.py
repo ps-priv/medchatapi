@@ -137,18 +137,18 @@ def apply_reaction_rules(
         return clamp_traits(traits)
 
     if detected_errors_count > 0:
-        traits["skepticism"] += min(0.18 * detected_errors_count, 0.5)
-        traits["openness"] -= min(0.2 * detected_errors_count, 0.5)
-        traits["patience"] -= min(0.12 * detected_errors_count, 0.35)
-        traits["time_pressure"] += min(0.01 * detected_errors_count, 0.04)
+        traits["skepticism"] += min(0.08 * detected_errors_count, 0.25)
+        traits["openness"] -= min(0.10 * detected_errors_count, 0.30)
+        traits["patience"] -= min(0.05 * detected_errors_count, 0.15)
+        traits["time_pressure"] += min(0.005 * detected_errors_count, 0.02)
 
     if analysis["marketing_hits"]:
-        penalty = min(0.06 * len(analysis["marketing_hits"]), 0.2)
+        penalty = min(0.04 * len(analysis["marketing_hits"]), 0.14)
         traits["skepticism"] += penalty
         traits["openness"] -= penalty
 
     if analysis.get("empty_praise_hits"):
-        traits["skepticism"] += min(0.15 * len(analysis["empty_praise_hits"]), 0.4)
+        traits["skepticism"] += min(0.08 * len(analysis["empty_praise_hits"]), 0.24)
 
     if analysis.get("evidence_hits"):
         traits["time_pressure"] -= min(0.08 * len(analysis["evidence_hits"]), 0.3)
@@ -160,13 +160,13 @@ def apply_reaction_rules(
         traits["skepticism"] -= min(0.1 * count, 0.3)
 
     if analysis["english_hits"]:
-        penalty = min(0.05 * len(analysis["english_hits"]), 0.2)
+        penalty = min(0.03 * len(analysis["english_hits"]), 0.12)
         traits["skepticism"] += penalty
         traits["patience"] -= penalty
 
     if analysis["off_topic_hits"] and not analysis["has_drug_focus"]:
-        traits["time_pressure"] += 0.01
-        traits["patience"] -= 0.08
+        traits["time_pressure"] += 0.005
+        traits["patience"] -= 0.04
 
     if analysis["gender_mismatch_hits"]:
         penalty = min(0.08 * len(analysis["gender_mismatch_hits"]), 0.24)
@@ -181,11 +181,11 @@ def apply_reaction_rules(
         traits["time_pressure"] += min(0.02 + 0.01 * len(analysis["inappropriate_hits"]), 0.04)
 
     if frustration_delta > 0:
-        traits["skepticism"] += min(0.04 * frustration_delta, 0.2)
-        traits["patience"] -= min(0.05 * frustration_delta, 0.25)
+        traits["skepticism"] += min(0.02 * frustration_delta, 0.10)
+        traits["patience"] -= min(0.025 * frustration_delta, 0.12)
 
     if frustration_total >= 6.0:
-        traits["openness"] -= 0.15
-        traits["time_pressure"] += 0.01
+        traits["openness"] -= 0.10
+        traits["time_pressure"] += 0.005
 
     return clamp_traits(traits)
