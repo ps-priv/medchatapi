@@ -65,7 +65,7 @@ def evaluate_conversation_goal(
     )
     clinical_ok = len(claim_check.get("false_claims", [])) == 0 and float(turn_metrics.get("clinical_precision", 0)) >= 0.7
     coverage_ratio = float(coverage_summary.get("coverage_ratio", 1.0))
-    coverage_ok = coverage_summary.get("total_critical", 0) == 0 or coverage_ratio >= 0.8
+    coverage_ok = coverage_summary.get("total_critical", 0) == 0 or coverage_ratio >= 0.70
     evidence_ok = not evidence_requirements.get("require_verification", False)
 
     if evidence_requirements.get("require_probe", False) and coverage_ratio < 0.8:
@@ -103,7 +103,7 @@ def evaluate_conversation_goal(
         base_score -= 0.12
 
     score = int(round(max(0.0, min(1.0, base_score)) * 100))
-    achieved = drug_revealed and decision_positive and ethical_ok and clinical_ok and coverage_ok and evidence_ok and doctor_satisfied and score >= 75
+    achieved = drug_revealed and decision_positive and ethical_ok and clinical_ok and coverage_ok and evidence_ok and doctor_satisfied and score >= 65
 
     if achieved:
         status = "achieved"

@@ -128,11 +128,11 @@ def update_conviction(
     topic_adherence = float(turn_metrics.get("topic_adherence", 0.0))
     if not has_false and not marketing_count and not message_analysis.get("bribery_hits"):
         if supported:
-            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.010 * min(supported, 2) * trust_gain_mult)
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.020 * min(supported, 2) * trust_gain_mult)
         if evidence_count:
-            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.010 * evidence_count * trust_gain_mult)
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.018 * evidence_count * trust_gain_mult)
         if not english_count and not message_analysis.get("inappropriate_hits") and topic_adherence >= 0.7:
-            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.012 * trust_gain_mult)
+            c["trust_in_rep"] = clamp01(c["trust_in_rep"] + 0.022 * trust_gain_mult)
 
     # --- Pokrycie claimów krytycznych ---
     critical_coverage = float(turn_metrics.get("critical_claim_coverage", 0.0))
