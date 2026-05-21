@@ -103,6 +103,10 @@ async def start_conversation(
     # brak body, pusty body, body z JSON, JSON z null, JSON z konfiguracją.
     session_config: Optional[SessionConfig] = None
     raw_body = await request.body()
+
+    _doctor_profile = get_doctor_by_id(doctor_id)
+    _allows_informal = bool(_doctor_profile and _doctor_profile.get("allows_informal", False))
+
     if raw_body:
         import json as _json
         try:
@@ -122,28 +126,36 @@ async def start_conversation(
                 ) from exc
 
             # INFORMAL + non-FAMILIAR: domyślnie niedozwolone (etykieta polska),
-            # chyba że archetyp lekarza jawnie dopuszcza komunikację nieformalna od razu.
+            # chyba że archetyp lekarza jawnie dopuszcza komunikację nieformalną od razu.
             if (
                 session_config.register == CommunicationRegister.INFORMAL
                 and session_config.familiarity != Familiarity.FAMILIAR
+                and not _allows_informal
             ):
-                doctor_profile = get_doctor_by_id(doctor_id)
-                if not (doctor_profile and doctor_profile.get("allows_informal", False)):
-                    raise HTTPException(
-                        status_code=422,
-                        detail={
-                            "message": "Niepoprawna konfiguracja sesji.",
-                            "errors": [
-                                {
-                                    "msg": (
-                                        "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
-                                        "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
-                                        "lekarz oczekuje formy 'Pan/Pani'."
-                                    )
-                                }
-                            ],
-                        },
-                    )
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "message": "Niepoprawna konfiguracja sesji.",
+                        "errors": [
+                            {
+                                "msg": (
+                                    "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
+                                    "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
+                                    "lekarz oczekuje formy 'Pan/Pani'."
+                                )
+                            }
+                        ],
+                    },
+                )
+    elif _allows_informal:
+        # Brak body + lekarz dopuszcza informal → stosuj domyślną konfigurację "starego znajomego".
+        session_config = SessionConfig(
+            familiarity=Familiarity.FAMILIAR,
+            register=CommunicationRegister.INFORMAL,
+            warmth="warm",
+            rep_name="Paweł",
+            prior_visits_summary="Trzecia wizyta. Omawialiśmy wcześniej IPP ogólnie i compliance pacjentów.",
+        )
 
     return start_session(
         doctor_id=doctor_id,

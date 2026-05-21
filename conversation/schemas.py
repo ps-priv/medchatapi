@@ -14,7 +14,7 @@ class Familiarity(str, Enum):
 
     FIRST_MEETING = "first_meeting"   # pierwsza wizyta, lekarz nie zna rozmówcy
     ACQUAINTED = "acquainted"         # znają się z poprzednich wizyt (relacja zawodowa)
-    FAMILIAR = "familiar"             # dobrze się znają, swobodna relacja
+    FAMILIAR = "acquainted"             # dobrze się znają, swobodna relacja
 
 
 class CommunicationRegister(str, Enum):
