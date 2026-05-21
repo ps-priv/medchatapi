@@ -3,9 +3,14 @@ uvicorn api4:app --reload --port 8000
 uvicorn api4:app --reload --port 8000
 
 docker build --platform linux/amd64 -t multizoneit/python-chat-api-dev .
+docker build --platform linux/amd64 -t multizoneit/python-chat-api .
 
 docker push multizoneit/python-chat-api-dev
-
+docker push multizoneit/python-chat-api
 docker pull multizoneit/python-chat-api-dev
+docker pull multizoneit/python-chat-api
+
 
 docker run -d -p 7892:8000 --env-file .env multizoneit/python-chat-api-dev
+docker run -d -p 7892:8000 --env-file .env multizoneit/python-chat-api-dev
+docker run -d -p 7891:8000 --env-file .env multizoneit/python-chat-api
