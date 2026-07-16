@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Kod aplikacji
-COPY api4.py ./
+COPY api7.py ./
 COPY conversation/ ./conversation/
 COPY langgraph_app/ ./langgraph_app/
 
@@ -27,4 +27,4 @@ VOLUME ["/app/chroma_db"]
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api4:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api7:app", "--host", "0.0.0.0", "--port", "8000"]
