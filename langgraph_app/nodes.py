@@ -19,6 +19,7 @@ from conversation.message_analysis import analyze_message
 from conversation.metrics import advance_phase, compute_frustration, compute_turn_metrics
 from conversation.keyword_triggers import apply_keyword_triggers
 from conversation.policy import (
+    MAX_TRAIT_STEP_PER_TURN,
     apply_reaction_rules,
     evidence_first_requirements,
     policy_postprocess_message,
@@ -602,6 +603,19 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     )
     rep_message = str(state.get("current_user_message", ""))
     updated_traits, _ = apply_keyword_triggers(rep_message, updated_traits)
+
+    # Domknięcie rate-limitu po WSZYSTKICH źródłach zmian (LLM + reguły + keyword triggery) —
+    # skepticism/patience nie mogą się zmienić o więcej niż MAX_TRAIT_STEP_PER_TURN względem
+    # wartości sprzed tej tury, niezależnie od tego, ile mechanizmów zadziałało naraz.
+    # Wyjątek: łapówka ma zostać natychmiastowa (apply_reaction_rules ustawia twarde 1.0/0.0).
+    if not message_analysis.get("bribery_hits"):
+        prior_traits = state.get("traits", {})
+        for _key in ("skepticism", "patience"):
+            _base = float(prior_traits.get(_key, 0.5))
+            updated_traits[_key] = max(
+                _base - MAX_TRAIT_STEP_PER_TURN, min(_base + MAX_TRAIT_STEP_PER_TURN, updated_traits[_key])
+            )
+        updated_traits = clamp_traits(updated_traits)
 
     # --- Sprawdzenie zakończenia ---
     is_terminated, termination_reason = check_termination(state={**state, "traits": updated_traits}, message_analysis=message_analysis)

@@ -5,6 +5,11 @@ from typing import Dict, List
 from .doctor_traits import clamp_traits
 from .message_analysis import limit_sentences
 
+# Maksymalna zmiana skepticism/patience w jednej turze — spowalnia narastanie
+# sceptycyzmu i spadek cierpliwości, żeby nie skakały skokowo mimo wielu
+# skumulowanych sygnałów w jednej wypowiedzi. Nie dotyczy łapówki (patrz niżej).
+MAX_TRAIT_STEP_PER_TURN = 0.05
+
 
 def policy_precheck(message_analysis: Dict, claim_check: Dict) -> Dict:
     """Buduje twarde dyrektywy policy przed wywołaniem LLM."""
@@ -187,5 +192,13 @@ def apply_reaction_rules(
     if frustration_total >= 6.0:
         traits["openness"] -= 0.10
         traits["time_pressure"] += 0.005
+
+    traits = clamp_traits(traits)
+
+    # Rate-limit: skepticism/patience mogą się zmienić najwyżej o MAX_TRAIT_STEP_PER_TURN
+    # w jedną turę, niezależnie od tego, ile sygnałów zadziałało naraz lub co zaproponował LLM.
+    for key in ("skepticism", "patience"):
+        base = float(current_traits.get(key, 0.5))
+        traits[key] = max(base - MAX_TRAIT_STEP_PER_TURN, min(base + MAX_TRAIT_STEP_PER_TURN, traits[key]))
 
     return clamp_traits(traits)
