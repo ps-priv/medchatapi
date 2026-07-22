@@ -41,6 +41,76 @@
         "time_pressure": -0.10
       },
       "numeric_bonus": 0.5
+    },
+    {
+      "phrase": "prezent",
+      "match_type": "word",
+      "comment": "Propozycja prezentu — twarda granica etyczna, zawsze ten sam komunikat, bez zmiany innych cech.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezenty",
+      "match_type": "word",
+      "comment": "Odmiana liczby mnogiej 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentu",
+      "match_type": "word",
+      "comment": "Odmiana dopełniacza 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentem",
+      "match_type": "word",
+      "comment": "Odmiana narzędnika 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentowi",
+      "match_type": "word",
+      "comment": "Odmiana celownika 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezencie",
+      "match_type": "word",
+      "comment": "Odmiana miejscownika 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentów",
+      "match_type": "word",
+      "comment": "Odmiana dopełniacza liczby mnogiej 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentom",
+      "match_type": "word",
+      "comment": "Odmiana celownika liczby mnogiej 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentami",
+      "match_type": "word",
+      "comment": "Odmiana narzędnika liczby mnogiej 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "prezentach",
+      "match_type": "word",
+      "comment": "Odmiana miejscownika liczby mnogiej 'prezent' — ta sama twarda granica.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
     }
   ]
 }

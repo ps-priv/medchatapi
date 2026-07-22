@@ -37,14 +37,18 @@ def apply_keyword_triggers(
     message: str,
     traits: Dict[str, float],
     already_bonused_phrases: Optional[Set[str]] = None,
-) -> Tuple[Dict[str, float], List[str], List[str], float]:
+) -> Tuple[Dict[str, float], List[str], List[str], float, Optional[str]]:
     """Wykrywa frazy-triggery w wiadomości i stosuje delty cech lekarza.
 
     Jeśli trigger ma "numeric_bonus" i w pobliżu dopasowanej frazy (± NUMERIC_BONUS_WINDOW
     znaków) pada wartość liczbowa lub %, dolicza bonus profesjonalizmu — ale tylko raz na
     daną frazę w całej sesji (already_bonused_phrases pilnuje tego między turami).
 
-    Zwraca (traits, triggered_phrases, newly_bonused_phrases, bonus_total).
+    Jeśli trigger ma "forced_reply", dopasowanie wymusza dokładnie ten tekst jako odpowiedź
+    lekarza (zamiast tego, co wygenerował LLM) — do twardych, niepodlegających negocjacji
+    granic (np. odmowa przyjęcia prezentu). Zwracany jest pierwszy trafiony forced_reply.
+
+    Zwraca (traits, triggered_phrases, newly_bonused_phrases, bonus_total, forced_reply).
     Każdy trigger odpala się co najwyżej raz na wiadomość, niezależnie od liczby wystąpień.
     """
     triggers = _load_triggers()
@@ -52,6 +56,7 @@ def apply_keyword_triggers(
     triggered_phrases: List[str] = []
     newly_bonused_phrases: List[str] = []
     bonus_total = 0.0
+    forced_reply: Optional[str] = None
     already_bonused = already_bonused_phrases or set()
 
     msg_lower = message.lower()
@@ -61,8 +66,9 @@ def apply_keyword_triggers(
         match_type: str = trigger.get("match_type", "word")
         deltas: Dict[str, float] = trigger.get("deltas", {})
         numeric_bonus = float(trigger.get("numeric_bonus", 0.0))
+        trigger_forced_reply: str = str(trigger.get("forced_reply", "") or "")
 
-        if not phrase or (not deltas and not numeric_bonus):
+        if not phrase or (not deltas and not numeric_bonus and not trigger_forced_reply):
             continue
 
         phrase_lower = phrase.lower()
@@ -84,8 +90,11 @@ def apply_keyword_triggers(
                 newly_bonused_phrases.append(phrase)
                 bonus_total += numeric_bonus
 
+        if trigger_forced_reply and forced_reply is None:
+            forced_reply = trigger_forced_reply
+
     if triggered_phrases:
         updated = clamp_traits(updated)
         logger.debug("keyword_triggers: trafione frazy=%s", triggered_phrases)
 
-    return updated, triggered_phrases, newly_bonused_phrases, bonus_total
+    return updated, triggered_phrases, newly_bonused_phrases, bonus_total, forced_reply

@@ -603,11 +603,16 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     )
     rep_message = str(state.get("current_user_message", ""))
     already_bonused = set(state.get("triggered_numeric_bonus_phrases", []))
-    updated_traits, _, newly_bonused_phrases, bonus_delta = apply_keyword_triggers(
+    updated_traits, _, newly_bonused_phrases, bonus_delta, forced_reply = apply_keyword_triggers(
         rep_message, updated_traits, already_bonused
     )
     triggered_numeric_bonus_phrases = list(state.get("triggered_numeric_bonus_phrases", [])) + newly_bonused_phrases
     professionalism_bonus = float(state.get("professionalism_bonus", 0.0)) + bonus_delta
+
+    # Wymuszona odpowiedź (np. twarda odmowa przyjęcia prezentu) zastępuje to, co
+    # wygenerował LLM — dokładnie ten sam tekst za każdym razem, bez parafraz.
+    if forced_reply:
+        doctor_message = forced_reply
 
     # Domknięcie rate-limitu po WSZYSTKICH źródłach zmian (LLM + reguły + keyword triggery) —
     # skepticism/patience nie mogą się zmienić o więcej niż MAX_TRAIT_STEP_PER_TURN względem
