@@ -37,7 +37,7 @@ def apply_keyword_triggers(
     message: str,
     traits: Dict[str, float],
     already_bonused_phrases: Optional[Set[str]] = None,
-) -> Tuple[Dict[str, float], List[str], List[str], Dict[str, float], Optional[str]]:
+) -> Tuple[Dict[str, float], List[str], List[str], Dict[str, float], Optional[str], List[str]]:
     """Wykrywa frazy-triggery w wiadomości i stosuje delty cech lekarza.
 
     Jeśli trigger ma "numeric_bonus" i w pobliżu dopasowanej frazy (± NUMERIC_BONUS_WINDOW
@@ -49,12 +49,16 @@ def apply_keyword_triggers(
     oceny końcowej — też tylko raz na daną frazę w całej sesji. Używane np. dla wymaganych
     claimów marketingowych, które przedstawiciel powinien wypowiedzieć w rozmowie.
 
+    Jeśli trigger ma "is_marketing_claim": true, każde jego dopasowanie (bez limitu, w
+    przeciwieństwie do bonusu) trafia do marketing_claim_hits — do zliczania, ile razy
+    przedstawiciel wypowiedział wymagane claimy marketingowe w całej rozmowie.
+
     Jeśli trigger ma "forced_reply", dopasowanie wymusza dokładnie ten tekst jako odpowiedź
     lekarza (zamiast tego, co wygenerował LLM) — do twardych, niepodlegających negocjacji
     granic (np. odmowa przyjęcia prezentu). Zwracany jest pierwszy trafiony forced_reply.
 
-    Zwraca (traits, triggered_phrases, newly_bonused_phrases, bonus_deltas, forced_reply),
-    gdzie bonus_deltas to {nazwa_pola_oceny: suma_bonusu_w_tej_turze}.
+    Zwraca (traits, triggered_phrases, newly_bonused_phrases, bonus_deltas, forced_reply,
+    marketing_claim_hits), gdzie bonus_deltas to {nazwa_pola_oceny: suma_bonusu_w_tej_turze}.
     Każdy trigger odpala się co najwyżej raz na wiadomość, niezależnie od liczby wystąpień.
     """
     triggers = _load_triggers()
@@ -63,6 +67,7 @@ def apply_keyword_triggers(
     newly_bonused_phrases: List[str] = []
     bonus_deltas: Dict[str, float] = {}
     forced_reply: Optional[str] = None
+    marketing_claim_hits: List[str] = []
     already_bonused = already_bonused_phrases or set()
 
     msg_lower = message.lower()
@@ -74,8 +79,9 @@ def apply_keyword_triggers(
         numeric_bonus = float(trigger.get("numeric_bonus", 0.0))
         flat_bonus: Dict[str, float] = trigger.get("flat_bonus", {}) or {}
         trigger_forced_reply: str = str(trigger.get("forced_reply", "") or "")
+        is_marketing_claim = bool(trigger.get("is_marketing_claim", False))
 
-        if not phrase or (not deltas and not numeric_bonus and not flat_bonus and not trigger_forced_reply):
+        if not phrase or (not deltas and not numeric_bonus and not flat_bonus and not trigger_forced_reply and not is_marketing_claim):
             continue
 
         phrase_lower = phrase.lower()
@@ -117,8 +123,11 @@ def apply_keyword_triggers(
         if trigger_forced_reply and forced_reply is None:
             forced_reply = trigger_forced_reply
 
+        if is_marketing_claim:
+            marketing_claim_hits.append(display_phrase)
+
     if triggered_phrases:
         updated = clamp_traits(updated)
         logger.debug("keyword_triggers: trafione frazy=%s", triggered_phrases)
 
-    return updated, triggered_phrases, newly_bonused_phrases, bonus_deltas, forced_reply
+    return updated, triggered_phrases, newly_bonused_phrases, bonus_deltas, forced_reply, marketing_claim_hits

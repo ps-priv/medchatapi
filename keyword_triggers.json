@@ -133,7 +133,8 @@
       "flat_bonus": {
         "professionalism_score": 1,
         "relevance_score": 1
-      }
+      },
+      "is_marketing_claim": true
     },
     {
       "phrase": "^(?=.*unikaln)(?=.*mechanizm)(?=.*optymaln)(?=.*bezpiecz)(?=.*remisj)(?!.*wszystkich\\s+pacjent)",
@@ -148,11 +149,12 @@
       "flat_bonus": {
         "professionalism_score": 1,
         "relevance_score": 1
-      }
+      },
+      "is_marketing_claim": true
     },
     {
       "phrase": "",
-      "comment": "MIEJSCE NA KOLEJNE CLAIMY MARKETINGOWE — ten wpis jest celowo pusty (phrase=\"\") i nic nie robi (silnik pomija wpisy bez phrase). Aby dodać nowy wymagany claim, dopisz kolejny obiekt do tej listy WG WZORU dwóch powyższych wpisów (\"claim marketingowy #1\" / \"#2\"): \"phrase\" — regex wymagający współwystąpienia charakterystycznych, rzadkich rdzeni słów z treści claimu (użyj (?=.*rdzeń1)(?=.*rdzeń2)... — kolejność lookaheadów jest dowolna, kolejność słów w wypowiedzi też); \"match_type\": \"regex\"; czytelny \"label\"; \"comment\" z pełną treścią claimu; \"deltas\" (zwykle skepticism -0.10 / openness +0.10 / patience +0.10); \"flat_bonus\": {\"professionalism_score\": 1, \"relevance_score\": 1}. Jeśli claim zawiera negatywny warunek (np. wykluczenie przesadzonej wersji), pamiętaj o kotwicy \"^\" na początku regexu — bez niej negative lookahead nie działa poprawnie."
+      "comment": "MIEJSCE NA KOLEJNE CLAIMY MARKETINGOWE — ten wpis jest celowo pusty (phrase=\"\") i nic nie robi (silnik pomija wpisy bez phrase). Aby dodać nowy wymagany claim, dopisz kolejny obiekt do tej listy WG WZORU dwóch powyższych wpisów (\"claim marketingowy #1\" / \"#2\"): \"phrase\" — regex wymagający współwystąpienia charakterystycznych, rzadkich rdzeni słów z treści claimu (użyj (?=.*rdzeń1)(?=.*rdzeń2)... — kolejność lookaheadów jest dowolna, kolejność słów w wypowiedzi też); \"match_type\": \"regex\"; czytelny \"label\"; \"comment\" z pełną treścią claimu; \"deltas\" (zwykle skepticism -0.10 / openness +0.10 / patience +0.10); \"flat_bonus\": {\"professionalism_score\": 1, \"relevance_score\": 1}; \"is_marketing_claim\": true (żeby claim był liczony w podsumowaniu rozmowy). Jeśli claim zawiera negatywny warunek (np. wykluczenie przesadzonej wersji), pamiętaj o kotwicy \"^\" na początku regexu — bez niej negative lookahead nie działa poprawnie."
     }
   ]
 }

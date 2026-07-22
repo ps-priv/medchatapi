@@ -74,6 +74,10 @@ class ConversationState(TypedDict, total=False):
     triggered_bonus_phrases: List[str]
     evaluation_score_bonuses: Dict[str, float]
 
+    # Licznik wymaganych claimów marketingowych wypowiedzianych przez przedstawiciela
+    # (każde wystąpienie, bez limitu — w odróżnieniu od jednorazowego bonusu do oceny)
+    marketing_claim_mentions: List[str]
+
     # Śledzenie celu rozmowy
     goal_achieved: bool
     goal_status: str

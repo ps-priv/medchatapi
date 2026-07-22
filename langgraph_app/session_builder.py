@@ -231,6 +231,7 @@ def build_initial_state(
         covered_major_claim_ids=[],
         triggered_bonus_phrases=[],
         evaluation_score_bonuses={},
+        marketing_claim_mentions=[],
         goal_achieved=False,
         goal_status="not_achieved",
         goal_score=0,

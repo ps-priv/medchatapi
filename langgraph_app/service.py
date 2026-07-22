@@ -237,6 +237,20 @@ def finish_session(session_id: str, api_key: str, model: str) -> Dict:
     final_conviction = state.get("conviction", {})
     final_decision = state.get("current_doctor_decision", "undecided")
 
+    marketing_claim_mentions = list(state.get("marketing_claim_mentions", []))
+    marketing_claims_used_count = len(marketing_claim_mentions)
+    if marketing_claims_used_count:
+        marketing_claims_note = (
+            f"Przedstawiciel wypowiedział wymagane claimy marketingowe {marketing_claims_used_count} "
+            f"raz(y) w trakcie rozmowy (konkretnie: {', '.join(marketing_claim_mentions)}). "
+            "W final_feedback WYRAŹNIE napisz, ile razy i że zostały użyte."
+        )
+    else:
+        marketing_claims_note = (
+            "Przedstawiciel NIE wypowiedział ani razu żadnego z wymaganych claimów marketingowych. "
+            "W final_feedback WYRAŹNIE zaznacz ten brak jako obszar do poprawy."
+        )
+
     evaluator_prompt = f"""
 Jesteś doświadczonym trenerem sprzedaży medycznej.
 
@@ -261,6 +275,8 @@ Finalny stan przekonań lekarza (conviction, skala 0-1):
 - dopasowanie leku do pacjentów: {final_conviction.get('perceived_fit', 0):.2f}
 - gotowość do decyzji: {final_conviction.get('decision_readiness', 0):.2f}
 Decyzja lekarza: {final_decision}
+
+Wymagane claimy marketingowe: {marketing_claims_note}
 
 Oceń przedstawiciela pod kątem:
 - profesjonalizmu,
@@ -324,6 +340,7 @@ Uwzględnij conviction i decyzję lekarza jako główny sygnał skuteczności ro
         "conversation_history": history_list,
         "conversation_goal": latest_goal,
         "evaluation": evaluation_dict,
+        "marketing_claims_used_count": marketing_claims_used_count,
         "turn_mode_histogram": mode_histogram,
         "turn_mode_flag": "rozmowa zbyt jednostronna — lekarz tylko reagował" if one_sided_flag else None,
     }

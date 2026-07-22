@@ -603,13 +603,14 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     )
     rep_message = str(state.get("current_user_message", ""))
     already_bonused = set(state.get("triggered_bonus_phrases", []))
-    updated_traits, _, newly_bonused_phrases, bonus_deltas, forced_reply = apply_keyword_triggers(
+    updated_traits, _, newly_bonused_phrases, bonus_deltas, forced_reply, marketing_claim_hits = apply_keyword_triggers(
         rep_message, updated_traits, already_bonused
     )
     triggered_bonus_phrases = list(state.get("triggered_bonus_phrases", [])) + newly_bonused_phrases
     evaluation_score_bonuses = dict(state.get("evaluation_score_bonuses", {}))
     for _score_name, _amount in bonus_deltas.items():
         evaluation_score_bonuses[_score_name] = evaluation_score_bonuses.get(_score_name, 0.0) + _amount
+    marketing_claim_mentions = list(state.get("marketing_claim_mentions", [])) + marketing_claim_hits
 
     # Wymuszona odpowiedź (np. twarda odmowa przyjęcia prezentu) zastępuje to, co
     # wygenerował LLM — dokładnie ten sam tekst za każdym razem, bez parafraz.
@@ -667,6 +668,7 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         "traits": updated_traits,
         "triggered_bonus_phrases": triggered_bonus_phrases,
         "evaluation_score_bonuses": evaluation_score_bonuses,
+        "marketing_claim_mentions": marketing_claim_mentions,
         "conviction": new_conviction,
         "doctor_agenda": doctor_agenda,
         "turn_modes_history": turn_modes_history,

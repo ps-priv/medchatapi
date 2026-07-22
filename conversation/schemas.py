@@ -392,6 +392,13 @@ class FinishConversationResponse(BaseModel):
     conversation_history: List[ConversationTurn] = Field(description="Pelna historia rozmowy.")
     conversation_goal: ConversationGoal = Field(description="Koncowy status realizacji celu rozmowy.")
     evaluation: EvaluationResult = Field(description="Ocena koncowa przygotowana przez ewaluator LLM.")
+    marketing_claims_used_count: int = Field(
+        default=0,
+        description=(
+            "Ile razy przedstawiciel wypowiedział wymagany claim marketingowy w całej rozmowie "
+            "(liczone deterministycznie, nie przez LLM). 0 = żaden claim marketingowy nie padł."
+        ),
+    )
     turn_mode_histogram: Optional[Dict[str, int]] = Field(
         default=None,
         description="Histogram trybów tur (REACT/PROBE/SHARE/CHALLENGE/DRIFT/CLOSE) — Etap 4.",
