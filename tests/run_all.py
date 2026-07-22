@@ -21,6 +21,7 @@ TESTS = [
     ("test_familiar_informal.py", "Znany lekarz / informal"),
     ("test_marketing_language.py", "Marketingowy język (buzzwords)"),
     ("test_hard_doctor.py", "Trudny lekarz (tired_cynic)"),
+    ("test_register_consistency.py", "Spójność rejestru (brak dryfu formalności w trakcie rozmowy)"),
     ("test_fournier_transcript.py", "Transkrypt Fournier/Noacid (busy_pragmatist, acquainted)"),
     ("test_traditionalist_transcript.py", "Transkrypt Tradycjonalista/Noacid (defensive_traditionalist, familiar)"),
 ]
