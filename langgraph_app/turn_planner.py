@@ -54,9 +54,12 @@ def derive_decision_from_conviction(conviction: Dict[str, float], state: Convers
     clinical = float(conviction.get("clinical_confidence", 0.2))
     fit = float(conviction.get("perceived_fit", 0.2))
     readiness = float(conviction.get("decision_readiness", 0.0))
+    turn_index = int(state.get("turn_index", 0))
 
-    # Hard reject — brak zaufania
-    if trust < 0.25:
+    # Hard reject — brak zaufania. Okres ochronny w pierwszych 2 turach: startowe
+    # zaufanie (np. 0.20 przy first_meeting) jest samo w sobie poniżej progu, a
+    # rozmówca nie miał jeszcze szansy go zbudować — nie odrzucaj na starcie rozmowy.
+    if trust < 0.25 and turn_index > 2:
         return "reject"
 
     avg_positive = (interest + trust + clinical + fit) / 4

@@ -223,7 +223,11 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
     if conviction:
         tr = float(conviction.get("trust_in_rep", 0.3))
         dr = float(conviction.get("decision_readiness", 0.0))
-        if tr < 0.25:
+        turn_index_c = int(state.get("turn_index", 0))
+        # Pierwsze 2 tury to okres ochronny — startowe zaufanie (np. 0.20 przy first_meeting)
+        # samo w sobie jest "krytycznie niskie", ale rozmówca nie miał jeszcze szansy
+        # go zbudować. Nie każ lekarzowi odrzucać propozycji, zanim rozmowa się zacznie.
+        if tr < 0.25 and turn_index_c > 2:
             conviction_rule = "Zaufanie krytycznie niskie — zmierzasz do odrzucenia propozycji."
         elif dr >= 0.75:
             conviction_rule = "Gotowość decyzji wysoka — możesz zasygnalizować decyzję."
