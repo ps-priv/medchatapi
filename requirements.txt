@@ -23,3 +23,6 @@ docx2txt
 
 # Supabase
 supabase
+
+# MongoDB
+pymongo

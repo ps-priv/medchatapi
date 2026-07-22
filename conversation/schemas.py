@@ -466,6 +466,46 @@ class RateConversationResponse(BaseModel):
     )
 
 
+class SaveSummaryRequest(BaseModel):
+    """Payload wejściowy endpointu /save-summary — pełne podsumowanie zakończonej rozmowy
+    (przebieg, ocena, parametry lekarza) do zapisu w MongoDB, na żądanie aplikacji webowej.
+
+    Kształt zgodny z tym, co zwraca /finish — klient wywołuje /finish, a następnie (opcjonalnie,
+    w dowolnym momencie) przekazuje ten sam zestaw danych tutaj, żeby zapisać kopię w MongoDB.
+    """
+
+    session_id: str = Field(description="Identyfikator zakończonej sesji rozmowy.")
+    doctor_id: Optional[str] = Field(default=None, description="ID archetypu lekarza.")
+    drug_id: Optional[str] = Field(default=None, description="ID leku.")
+    conversation_history: List[ConversationTurn] = Field(description="Pełna historia rozmowy.")
+    evaluation: EvaluationResult = Field(description="Ocena końcowa rozmowy (z /finish).")
+    conversation_goal: ConversationGoal = Field(description="Status realizacji celu rozmowy.")
+    turn_metrics_history: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Metryki jakości per tura."
+    )
+    final_traits: Optional[TraitsUpdate] = Field(
+        default=None, description="Finalne cechy psychologiczne lekarza."
+    )
+    frustration_score: float = Field(default=0.0, description="Końcowy poziom frustracji lekarza (0-10).")
+    phase: str = Field(default="unknown", description="Ostatnia faza rozmowy.")
+    turn_count: int = Field(default=0, description="Liczba tur rozmowy.")
+    is_terminated: bool = Field(default=False, description="Czy rozmowa zakończyła się przedwcześnie.")
+    critical_flags: List[str] = Field(default_factory=list, description="Flagi krytyczne (np. naruszenie etyki).")
+    marketing_claims_used_count: int = Field(
+        default=0, description="Ile razy przedstawiciel wypowiedział wymagany claim marketingowy."
+    )
+
+
+class SaveSummaryResponse(BaseModel):
+    """Kontrakt odpowiedzi endpointu /save-summary."""
+
+    status: str = Field(description="Potwierdzenie zapisu podsumowania do MongoDB.")
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"status": "Podsumowanie zapisane do MongoDB."}}
+    )
+
+
 class TTSRequest(BaseModel):
     """Payload wejściowy endpointu /tts."""
 

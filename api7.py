@@ -22,6 +22,8 @@ from conversation.schemas import (
     MessageSuccessResponse,
     RateConversationRequest,
     RateConversationResponse,
+    SaveSummaryRequest,
+    SaveSummaryResponse,
     SessionConfig,
     StartConversationResponse,
     TraitsUpdate,
@@ -36,8 +38,10 @@ from conversation.transcribe import transcribe_audio_file_request, transcribe_au
 from conversation.tts import synthesize_speech
 from langgraph_app.service import finish_session, process_message, start_session
 from langgraph_app.supabase_service import SupabaseService
+from langgraph_app.mongo_service import MongoService
 
 _supabase = SupabaseService()
+_mongo = MongoService()
 
 # ---------------------------------------------------------------------------
 # Konfiguracja
@@ -180,6 +184,21 @@ async def rate_conversation(req: RateConversationRequest):
         description=req.description,
     )
     return {"status": "Ocena zapisana."}
+
+
+@app.post(
+    "/save-summary",
+    response_model=SaveSummaryResponse,
+    summary="Zapis podsumowania rozmowy do MongoDB",
+)
+async def save_summary(req: SaveSummaryRequest):
+    """Zapisuje pełne podsumowanie zakończonej rozmowy (przebieg, ocenę, parametry lekarza)
+    do MongoDB, na żądanie aplikacji webowej. Kształt payloadu odpowiada temu, co zwraca /finish."""
+    try:
+        _mongo.save_summary(req.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Nie udało się zapisać podsumowania do MongoDB: {exc}")
+    return {"status": "Podsumowanie zapisane do MongoDB."}
 
 
 @app.post(
