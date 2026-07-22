@@ -68,9 +68,11 @@ class ConversationState(TypedDict, total=False):
     covered_critical_claim_ids: List[str]
     covered_major_claim_ids: List[str]
 
-    # Bonus profesjonalizmu ze słów-kluczy z liczbą/% w pobliżu (keyword_triggers.json)
-    triggered_numeric_bonus_phrases: List[str]
-    professionalism_bonus: float
+    # Bonusy do ocen końcowych ze słów-kluczy/claimów (keyword_triggers.json) — np.
+    # "skuteczność + liczba" (professionalism_score) albo wymagane claimy marketingowe
+    # (professionalism_score + relevance_score). Raz na frazę w całej sesji.
+    triggered_bonus_phrases: List[str]
+    evaluation_score_bonuses: Dict[str, float]
 
     # Śledzenie celu rozmowy
     goal_achieved: bool

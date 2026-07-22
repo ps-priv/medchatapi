@@ -119,6 +119,40 @@
       "comment": "Powołanie się na 'badanie 4 fazy' w dowolnej postaci (np. 'badanie 4 fazy', 'czterofazowe badanie', 'badanie cztery fazy wykazało...') — twarda granica, zawsze ten sam komunikat.",
       "deltas": {},
       "forced_reply": "Nie przyjmuję pseudobadań, a w wyborze leku kieruję się swoim doświadczeniem i badaniami."
+    },
+    {
+      "phrase": "(?=.*ranitydyn)(?=.*remisj)",
+      "match_type": "regex",
+      "label": "claim marketingowy #1 (Noacid vs ranitydyna, remisja 2/4 tyg.)",
+      "comment": "Wymagany claim marketingowy #1: 'Przy zastosowaniu pantoprazolu Noacid 20 mg, można mieć pewność, że tak jak w badaniu wykaże on znamiennie wyższą skuteczność w osiąganiu remisji po 2 i 4 tygodniach niż w przypadku np. ranitydyny.' Łapie też parafrazy — wymaga współwystąpienia 'ranitydyna' i 'remisja'. Bonus tylko raz na całą rozmowę.",
+      "deltas": {
+        "skepticism": -0.10,
+        "openness": 0.10,
+        "patience": 0.10
+      },
+      "flat_bonus": {
+        "professionalism_score": 1,
+        "relevance_score": 1
+      }
+    },
+    {
+      "phrase": "^(?=.*unikaln)(?=.*mechanizm)(?=.*optymaln)(?=.*bezpiecz)(?=.*remisj)(?!.*wszystkich\\s+pacjent)",
+      "match_type": "regex",
+      "label": "claim marketingowy #2 (unikalny mechanizm, profil bezpieczeństwa, remisja)",
+      "comment": "Wymagany claim marketingowy #2 (zlagodzona wersja bez 'wszystkich pacjentow', zeby nie kolidowac z noacid_contraindications i istniejacymi scenariuszami false-claim w testach): 'NoAcid to skuteczna terapia dla pacjentów z GERD dzięki unikalnemu mechanizmowi działania, optymalnemu profilowi bezpieczeństwa i wysokiemu stopniowi uzyskania remisji.' Lapie parafrazy wymagajace wspolwystapienia: unikalny + mechanizm + optymalny + bezpieczenstwo + remisja. Negative lookahead celowo wyklucza warianty z 'wszystkich pacjentow' (klinicznie falszywy overclaim, patrz noacid_contraindications) - taki wariant NIE dostaje bonusu. Bonus tylko raz na cala rozmowe.",
+      "deltas": {
+        "skepticism": -0.10,
+        "openness": 0.10,
+        "patience": 0.10
+      },
+      "flat_bonus": {
+        "professionalism_score": 1,
+        "relevance_score": 1
+      }
+    },
+    {
+      "phrase": "",
+      "comment": "MIEJSCE NA KOLEJNE CLAIMY MARKETINGOWE — ten wpis jest celowo pusty (phrase=\"\") i nic nie robi (silnik pomija wpisy bez phrase). Aby dodać nowy wymagany claim, dopisz kolejny obiekt do tej listy WG WZORU dwóch powyższych wpisów (\"claim marketingowy #1\" / \"#2\"): \"phrase\" — regex wymagający współwystąpienia charakterystycznych, rzadkich rdzeni słów z treści claimu (użyj (?=.*rdzeń1)(?=.*rdzeń2)... — kolejność lookaheadów jest dowolna, kolejność słów w wypowiedzi też); \"match_type\": \"regex\"; czytelny \"label\"; \"comment\" z pełną treścią claimu; \"deltas\" (zwykle skepticism -0.10 / openness +0.10 / patience +0.10); \"flat_bonus\": {\"professionalism_score\": 1, \"relevance_score\": 1}. Jeśli claim zawiera negatywny warunek (np. wykluczenie przesadzonej wersji), pamiętaj o kotwicy \"^\" na początku regexu — bez niej negative lookahead nie działa poprawnie."
     }
   ]
 }

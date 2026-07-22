@@ -251,7 +251,9 @@ class EvaluationResult(BaseModel):
     professionalism_score: float = Field(
         description="Ocena profesjonalizmu 1-10 (może mieć .5 z bonusów za konkretne dane liczbowe)."
     )
-    relevance_score: int = Field(description="Ocena trafnosci argumentow 1-10.")
+    relevance_score: float = Field(
+        description="Ocena trafnosci argumentow 1-10 (moze miec bonus za wymagane claimy marketingowe)."
+    )
     relationship_score: int = Field(description="Ocena budowania relacji 1-10.")
     strengths: List[str] = Field(description="2-3 mocne strony przedstawiciela.")
     areas_for_improvement: List[str] = Field(

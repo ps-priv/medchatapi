@@ -286,13 +286,13 @@ Uwzględnij conviction i decyzję lekarza jako główny sygnał skuteczności ro
 
     evaluation_dict = evaluation.model_dump()
 
-    # Bonus profesjonalizmu ze słów-kluczy podanych z konkretną liczbą/% (keyword_triggers.json),
-    # doliczany mechanicznie do oceny LLM — max 10.
-    professionalism_bonus = float(state.get("professionalism_bonus", 0.0))
-    if professionalism_bonus:
-        evaluation_dict["professionalism_score"] = min(
-            10.0, float(evaluation_dict["professionalism_score"]) + professionalism_bonus
-        )
+    # Bonusy do ocen końcowych ze słów-kluczy/claimów (keyword_triggers.json) — np. "skuteczność
+    # + liczba" (professionalism_score) albo wymagane claimy marketingowe (professionalism_score
+    # + relevance_score) — doliczane mechanicznie do oceny LLM, max 10 na pole.
+    evaluation_score_bonuses = dict(state.get("evaluation_score_bonuses", {}))
+    for score_name, bonus in evaluation_score_bonuses.items():
+        if bonus and score_name in evaluation_dict:
+            evaluation_dict[score_name] = min(10.0, float(evaluation_dict[score_name]) + bonus)
 
     _supabase.save_conversation(
         session_id=session_id,
