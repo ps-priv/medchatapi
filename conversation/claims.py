@@ -105,11 +105,13 @@ def load_claims_for_drug(drug_info: Dict) -> List[Dict]:
 
 
 def build_claim_catalog(drug_info: Dict) -> Dict:
-    """Tworzy indeks claimów oraz listy claimów krytycznych."""
+    """Tworzy indeks claimów oraz listy claimów krytycznych i głównych (major)."""
     claims = load_claims_for_drug(drug_info)
     claim_index: Dict[str, Dict] = {}
     critical_claim_ids: List[str] = []
     critical_claim_labels: List[str] = []
+    major_claim_ids: List[str] = []
+    major_claim_labels: List[str] = []
 
     for claim in claims:
         claim_id = str(claim.get("id", "unknown_claim"))
@@ -119,19 +121,26 @@ def build_claim_catalog(drug_info: Dict) -> Dict:
         if severity == "critical":
             critical_claim_ids.append(claim_id)
             critical_claim_labels.append(statement)
+        elif severity == "major":
+            major_claim_ids.append(claim_id)
+            major_claim_labels.append(statement)
 
     return {
         "claim_index": claim_index,
         "critical_claim_ids": critical_claim_ids,
         "critical_claim_labels": critical_claim_labels,
+        "major_claim_ids": major_claim_ids,
+        "major_claim_labels": major_claim_labels,
     }
 
 
 def update_claim_coverage(state: Dict, claim_check: Dict) -> Dict:
-    """Aktualizuje pokrycie claimów na bazie bieżącej wypowiedzi."""
+    """Aktualizuje pokrycie claimów krytycznych i głównych (major) na bazie bieżącej wypowiedzi."""
     seen_claim_ids = set(state.get("seen_claim_ids", []))
     covered_critical_ids = set(state.get("covered_critical_claim_ids", []))
     critical_claim_ids = set(state.get("critical_claim_ids", []))
+    covered_major_ids = set(state.get("covered_major_claim_ids", []))
+    major_claim_ids = set(state.get("major_claim_ids", []))
 
     for match in claim_check.get("claim_matches", []):
         claim_id = str(match.get("id", ""))
@@ -140,19 +149,28 @@ def update_claim_coverage(state: Dict, claim_check: Dict) -> Dict:
         seen_claim_ids.add(claim_id)
         if claim_id in critical_claim_ids:
             covered_critical_ids.add(claim_id)
+        elif claim_id in major_claim_ids:
+            covered_major_ids.add(claim_id)
 
     state["seen_claim_ids"] = sorted(seen_claim_ids)
     state["covered_critical_claim_ids"] = sorted(covered_critical_ids)
+    state["covered_major_claim_ids"] = sorted(covered_major_ids)
 
     missing_critical_ids = sorted(critical_claim_ids.difference(covered_critical_ids))
+    missing_major_ids = sorted(major_claim_ids.difference(covered_major_ids))
     claim_index = state.get("claim_index", {})
     missing_critical_labels = [
         str(claim_index.get(claim_id, {}).get("statement", claim_id)) for claim_id in missing_critical_ids
+    ]
+    missing_major_labels = [
+        str(claim_index.get(claim_id, {}).get("statement", claim_id)) for claim_id in missing_major_ids
     ]
 
     return {
         "missing_critical_ids": missing_critical_ids,
         "missing_critical_labels": missing_critical_labels,
+        "missing_major_ids": missing_major_ids,
+        "missing_major_labels": missing_major_labels,
     }
 
 

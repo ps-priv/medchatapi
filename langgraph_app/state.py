@@ -62,8 +62,11 @@ class ConversationState(TypedDict, total=False):
     claim_index: Dict[str, Any]
     critical_claim_ids: List[str]
     critical_claim_labels: List[str]
+    major_claim_ids: List[str]
+    major_claim_labels: List[str]
     seen_claim_ids: List[str]
     covered_critical_claim_ids: List[str]
+    covered_major_claim_ids: List[str]
 
     # Śledzenie celu rozmowy
     goal_achieved: bool

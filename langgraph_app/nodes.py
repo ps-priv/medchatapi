@@ -57,6 +57,7 @@ EMPTY_CLAIM_CHECK = {
     "severity_counts": {"critical": 0, "major": 0, "minor": 0},
     "coverage": {"total_critical": 0, "covered_critical": 0, "missing_critical": 0, "coverage_ratio": 1.0},
     "missing_critical_labels": [], "missing_critical_ids": [],
+    "missing_major_labels": [], "missing_major_ids": [],
 }
 
 
@@ -119,12 +120,17 @@ def node_analyze(state: ConversationState) -> Dict:
         coverage_summary = critical_coverage_summary(state)
     else:
         claim_check = dict(EMPTY_CLAIM_CHECK)
-        coverage_update = {"missing_critical_ids": [], "missing_critical_labels": []}
+        coverage_update = {
+            "missing_critical_ids": [], "missing_critical_labels": [],
+            "missing_major_ids": [], "missing_major_labels": [],
+        }
         coverage_summary = {"total_critical": 0, "covered_critical": 0, "missing_critical": 0, "coverage_ratio": 1.0}
 
     claim_check["coverage"] = coverage_summary
     claim_check["missing_critical_labels"] = coverage_update["missing_critical_labels"]
     claim_check["missing_critical_ids"] = coverage_update["missing_critical_ids"]
+    claim_check["missing_major_labels"] = coverage_update["missing_major_labels"]
+    claim_check["missing_major_ids"] = coverage_update["missing_major_ids"]
 
     evidence_reqs = evidence_first_requirements(
         message_analysis=message_analysis,
@@ -325,7 +331,11 @@ def node_build_directives(state: ConversationState) -> Dict:
     intent_revealed = bool(state.get("intent_revealed", False))
     drug_revealed = bool(state.get("drug_revealed", False))
     wrong_drug = bool(state.get("wrong_drug_suspected", False))
-    missing_labels = coverage_update.get("missing_critical_labels", [])
+    # Priorytet: najpierw brakujące claimy krytyczne, potem major — pytamy zawsze o jeden, najpilniejszy.
+    missing_labels = (
+        coverage_update.get("missing_critical_labels", [])
+        + coverage_update.get("missing_major_labels", [])
+    )
 
     directives = []
     directives.extend(style_runtime["directives"])

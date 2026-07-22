@@ -58,19 +58,19 @@ def evidence_first_requirements(message_analysis: Dict, claim_check: Dict, state
     followup_question = ""
     if require_verification:
         directives.append(
-            "Tryb evidence-first: zakwestionuj twierdzenia bez pokrycia i poproś o źródło oraz parametry danych."
+            "Tryb evidence-first: zakwestionuj twierdzenie bez pokrycia i dopytaj TYLKO o jeden brakujący "
+            "element (np. samo źródło albo samą dawkę) — nie wymieniaj kilku naraz."
         )
         followup_question = (
-            "Proszę podać konkretne źródło i dane (np. populacja, punkt końcowy, dawka), "
-            "które potwierdzają tę tezę."
+            "Proszę podać źródło tej tezy."
         )
     elif require_probe:
         directives.append(
-            "Tryb evidence-first: dopytaj o konkret kliniczny potwierdzający skuteczność lub bezpieczeństwo."
+            "Tryb evidence-first: dopytaj o JEDEN konkretny parametr kliniczny potwierdzający skuteczność "
+            "lub bezpieczeństwo (np. tylko liczby, albo tylko populację) — nie o kilka naraz."
         )
         followup_question = (
-            "Jakie konkretne dane kliniczne potwierdzają to twierdzenie "
-            "(np. liczby, populacja, porównanie, bezpieczeństwo)?"
+            "Jakie konkretne dane kliniczne potwierdzają to twierdzenie?"
         )
 
     return {

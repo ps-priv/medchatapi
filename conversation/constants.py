@@ -212,7 +212,7 @@ PHASE_OBJECTIVES = {
     "opening": "Krótko ustaw kontekst i poproś o konkretną wartość kliniczną leku.",
     "needs": "Doprecyzuj profil pacjenta i praktyczne zastosowanie leku.",
     "objection": "Wyraź kluczową obiekcję i wymagaj merytorycznej odpowiedzi.",
-    "evidence": "Wymagaj danych: bezpieczeństwo, przeciwwskazania, dawkowanie.",
+    "evidence": "Wybierz JEDEN parametr (bezpieczeństwo, przeciwwskazania lub dawkowanie) i dopytaj tylko o niego — nigdy nie wymieniaj kilku naraz.",
     "close": "Domknij rozmowę i zakończ spotkanie bez nowych wątków.",
 }
 
