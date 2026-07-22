@@ -248,7 +248,9 @@ class TranscribeResponse(BaseModel):
 class EvaluationResult(BaseModel):
     """Ocena koncowa rozmowy przygotowana przez ewaluatora LLM."""
 
-    professionalism_score: int = Field(description="Ocena profesjonalizmu 1-10.")
+    professionalism_score: float = Field(
+        description="Ocena profesjonalizmu 1-10 (może mieć .5 z bonusów za konkretne dane liczbowe)."
+    )
     relevance_score: int = Field(description="Ocena trafnosci argumentow 1-10.")
     relationship_score: int = Field(description="Ocena budowania relacji 1-10.")
     strengths: List[str] = Field(description="2-3 mocne strony przedstawiciela.")

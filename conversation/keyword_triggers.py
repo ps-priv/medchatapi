@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from .doctor_traits import clamp_traits
 
@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 
 _CONFIG_PATH = Path(__file__).parent.parent / "keyword_triggers.json"
 _triggers: List[Dict] | None = None
+
+# Liczba znaków wokół dopasowanej frazy, w których szukamy wartości liczbowej/% —
+# uzasadnia bonus profesjonalizmu (np. "skuteczność 87%" zamiast gołego słowa).
+NUMERIC_BONUS_WINDOW = 40
+_NUMBER_NEARBY_RE = re.compile(r"\d+(?:[.,]\d+)?\s*%?")
 
 
 def _load_triggers() -> List[Dict]:
@@ -28,15 +33,26 @@ def _load_triggers() -> List[Dict]:
     return _triggers
 
 
-def apply_keyword_triggers(message: str, traits: Dict[str, float]) -> Tuple[Dict[str, float], List[str]]:
+def apply_keyword_triggers(
+    message: str,
+    traits: Dict[str, float],
+    already_bonused_phrases: Optional[Set[str]] = None,
+) -> Tuple[Dict[str, float], List[str], List[str], float]:
     """Wykrywa frazy-triggery w wiadomości i stosuje delty cech lekarza.
 
-    Zwraca zaktualizowany dict traits oraz listę trafionych fraz (do logowania).
+    Jeśli trigger ma "numeric_bonus" i w pobliżu dopasowanej frazy (± NUMERIC_BONUS_WINDOW
+    znaków) pada wartość liczbowa lub %, dolicza bonus profesjonalizmu — ale tylko raz na
+    daną frazę w całej sesji (already_bonused_phrases pilnuje tego między turami).
+
+    Zwraca (traits, triggered_phrases, newly_bonused_phrases, bonus_total).
     Każdy trigger odpala się co najwyżej raz na wiadomość, niezależnie od liczby wystąpień.
     """
     triggers = _load_triggers()
     updated = dict(traits)
     triggered_phrases: List[str] = []
+    newly_bonused_phrases: List[str] = []
+    bonus_total = 0.0
+    already_bonused = already_bonused_phrases or set()
 
     msg_lower = message.lower()
 
@@ -44,26 +60,32 @@ def apply_keyword_triggers(message: str, traits: Dict[str, float]) -> Tuple[Dict
         phrase: str = trigger.get("phrase", "")
         match_type: str = trigger.get("match_type", "word")
         deltas: Dict[str, float] = trigger.get("deltas", {})
+        numeric_bonus = float(trigger.get("numeric_bonus", 0.0))
 
-        if not phrase or not deltas:
+        if not phrase or (not deltas and not numeric_bonus):
             continue
 
         phrase_lower = phrase.lower()
+        pattern = r"\b" + re.escape(phrase_lower) + r"\b" if match_type == "word" else re.escape(phrase_lower)
+        match = re.search(pattern, msg_lower)
 
-        if match_type == "word":
-            pattern = r"\b" + re.escape(phrase_lower) + r"\b"
-            matched = bool(re.search(pattern, msg_lower))
-        else:
-            matched = phrase_lower in msg_lower
+        if not match:
+            continue
 
-        if matched:
-            triggered_phrases.append(phrase)
-            for trait, delta in deltas.items():
-                if trait in updated:
-                    updated[trait] = updated[trait] + float(delta)
+        triggered_phrases.append(phrase)
+        for trait, delta in deltas.items():
+            if trait in updated:
+                updated[trait] = updated[trait] + float(delta)
+
+        if numeric_bonus and phrase not in already_bonused:
+            window_start = max(0, match.start() - NUMERIC_BONUS_WINDOW)
+            window_end = min(len(message), match.end() + NUMERIC_BONUS_WINDOW)
+            if _NUMBER_NEARBY_RE.search(message[window_start:window_end]):
+                newly_bonused_phrases.append(phrase)
+                bonus_total += numeric_bonus
 
     if triggered_phrases:
         updated = clamp_traits(updated)
         logger.debug("keyword_triggers: trafione frazy=%s", triggered_phrases)
 
-    return updated, triggered_phrases
+    return updated, triggered_phrases, newly_bonused_phrases, bonus_total

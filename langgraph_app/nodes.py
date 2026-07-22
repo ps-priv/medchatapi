@@ -602,7 +602,12 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
         frustration_total=float(frustration_update.get("total", 0.0)),
     )
     rep_message = str(state.get("current_user_message", ""))
-    updated_traits, _ = apply_keyword_triggers(rep_message, updated_traits)
+    already_bonused = set(state.get("triggered_numeric_bonus_phrases", []))
+    updated_traits, _, newly_bonused_phrases, bonus_delta = apply_keyword_triggers(
+        rep_message, updated_traits, already_bonused
+    )
+    triggered_numeric_bonus_phrases = list(state.get("triggered_numeric_bonus_phrases", [])) + newly_bonused_phrases
+    professionalism_bonus = float(state.get("professionalism_bonus", 0.0)) + bonus_delta
 
     # Domknięcie rate-limitu po WSZYSTKICH źródłach zmian (LLM + reguły + keyword triggery) —
     # skepticism/patience nie mogą się zmienić o więcej niż MAX_TRAIT_STEP_PER_TURN względem
@@ -653,6 +658,8 @@ def node_finalize(state: ConversationState) -> Dict:  # noqa: C901
     return {
         "messages": new_messages,
         "traits": updated_traits,
+        "triggered_numeric_bonus_phrases": triggered_numeric_bonus_phrases,
+        "professionalism_bonus": professionalism_bonus,
         "conviction": new_conviction,
         "doctor_agenda": doctor_agenda,
         "turn_modes_history": turn_modes_history,

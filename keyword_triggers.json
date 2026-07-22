@@ -31,6 +31,16 @@
       "deltas": {
         "patience": 0.10
       }
+    },
+    {
+      "phrase": "skuteczno",
+      "match_type": "substring",
+      "comment": "Skuteczność (odmiana rzeczownikowa) → lekarz bardziej otwarty i mniej pod presją czasu. Jeśli w pobliżu pada liczba/% — bonus profesjonalizmu (raz na sesję dla tej frazy).",
+      "deltas": {
+        "openness": 0.10,
+        "time_pressure": -0.10
+      },
+      "numeric_bonus": 0.5
     }
   ]
 }

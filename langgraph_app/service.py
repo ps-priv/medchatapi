@@ -286,6 +286,14 @@ Uwzględnij conviction i decyzję lekarza jako główny sygnał skuteczności ro
 
     evaluation_dict = evaluation.model_dump()
 
+    # Bonus profesjonalizmu ze słów-kluczy podanych z konkretną liczbą/% (keyword_triggers.json),
+    # doliczany mechanicznie do oceny LLM — max 10.
+    professionalism_bonus = float(state.get("professionalism_bonus", 0.0))
+    if professionalism_bonus:
+        evaluation_dict["professionalism_score"] = min(
+            10.0, float(evaluation_dict["professionalism_score"]) + professionalism_bonus
+        )
+
     _supabase.save_conversation(
         session_id=session_id,
         doctor_profile=state.get("doctor_profile", {}),

@@ -229,6 +229,8 @@ def build_initial_state(
         seen_claim_ids=[],
         covered_critical_claim_ids=[],
         covered_major_claim_ids=[],
+        triggered_numeric_bonus_phrases=[],
+        professionalism_bonus=0.0,
         goal_achieved=False,
         goal_status="not_achieved",
         goal_score=0,

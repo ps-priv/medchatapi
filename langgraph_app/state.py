@@ -68,6 +68,10 @@ class ConversationState(TypedDict, total=False):
     covered_critical_claim_ids: List[str]
     covered_major_claim_ids: List[str]
 
+    # Bonus profesjonalizmu ze słów-kluczy z liczbą/% w pobliżu (keyword_triggers.json)
+    triggered_numeric_bonus_phrases: List[str]
+    professionalism_bonus: float
+
     # Śledzenie celu rozmowy
     goal_achieved: bool
     goal_status: str
