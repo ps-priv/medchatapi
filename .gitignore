@@ -9,3 +9,4 @@ chroma_db/chroma.sqlite3
 chroma_db/19698ffa-1714-4347-b595-8b05965ffc6b/data_level0.bin
 conversation/__pycache__/schemas.cpython-312.pyc
 chroma_db/19698ffa-1714-4347-b595-8b05965ffc6b/data_level0.bin
+.idea/
