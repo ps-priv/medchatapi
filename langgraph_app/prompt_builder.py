@@ -201,12 +201,24 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
     # Sekcja C — TWARDE BEZPIECZNIKI
     # ----------------------------------------------------------------
 
+    rep_ref_c = f" ({rep_name})" if rep_name else ""
     if register == "informal":
-        form_rule = "Jesteście na 'ty' — nie koryguj formy grzecznościowej."
+        form_rule = (
+            "Jesteście na 'ty' — nie koryguj formy grzecznościowej. "
+            f"Ty również zwracaj się do rozmówcy{rep_ref_c} per 'ty' — nigdy nie przechodź na 'Pan/Pani', "
+            "nawet przy frustracji czy zmianie tonu."
+        )
     elif message_analysis.get("gender_mismatch_hits"):
-        form_rule = f"Rozmówca użył niepoprawnej formy w TEJ wypowiedzi — popraw go: '{message_analysis.get('expected_address', 'pani/pan doktor')}'."
+        form_rule = (
+            f"Rozmówca użył niepoprawnej formy w TEJ wypowiedzi — popraw go: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. "
+            f"Ty zwracaj się do rozmówcy{rep_ref_c} per 'Panie'/'Pani' + imię — raz wybraną formę utrzymuj przez całą rozmowę."
+        )
     else:
-        form_rule = f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj tylko jeśli rozmówca faktycznie się pomyli — nie przypominaj bez powodu."
+        form_rule = (
+            f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj tylko jeśli rozmówca faktycznie się pomyli — nie przypominaj bez powodu. "
+            f"Ty zwracaj się do rozmówcy{rep_ref_c} per 'Panie'/'Pani' + imię — raz wybraną formę utrzymuj przez całą rozmowę, "
+            "nie zmieniaj jej mimo frustracji czy tonu rozmowy."
+        )
 
     if conviction:
         tr = float(conviction.get("trust_in_rep", 0.3))
