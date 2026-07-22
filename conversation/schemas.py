@@ -494,6 +494,12 @@ class SaveSummaryRequest(BaseModel):
     marketing_claims_used_count: int = Field(
         default=0, description="Ile razy przedstawiciel wypowiedział wymagany claim marketingowy."
     )
+    rating: Optional[int] = Field(
+        default=None, ge=0, le=5, description="Ocena rozmowy przez użytkownika, skala 0-5 (opcjonalna)."
+    )
+    description: Optional[str] = Field(
+        default=None, description="Opcjonalny komentarz/wrażenia użytkownika o rozmowie."
+    )
 
 
 class SaveSummaryResponse(BaseModel):
