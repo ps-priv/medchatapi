@@ -111,6 +111,14 @@
       "comment": "Odmiana miejscownika liczby mnogiej 'prezent' — ta sama twarda granica.",
       "deltas": {},
       "forced_reply": "Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę."
+    },
+    {
+      "phrase": "(?=.*(?:badani|badań))(?=.*(?:4\\s*-?\\s*faz|cztery\\s*-?\\s*faz|czter\\w*faz|iv\\s*-?\\s*faz|faz\\w*\\s*-?\\s*(?:4|iv|czter)))",
+      "match_type": "regex",
+      "label": "badanie 4 fazy",
+      "comment": "Powołanie się na 'badanie 4 fazy' w dowolnej postaci (np. 'badanie 4 fazy', 'czterofazowe badanie', 'badanie cztery fazy wykazało...') — twarda granica, zawsze ten sam komunikat.",
+      "deltas": {},
+      "forced_reply": "Nie przyjmuję pseudobadań, a w wyborze leku kieruję się swoim doświadczeniem i badaniami."
     }
   ]
 }

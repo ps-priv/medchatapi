@@ -72,22 +72,31 @@ def apply_keyword_triggers(
             continue
 
         phrase_lower = phrase.lower()
-        pattern = r"\b" + re.escape(phrase_lower) + r"\b" if match_type == "word" else re.escape(phrase_lower)
+        if match_type == "word":
+            pattern = r"\b" + re.escape(phrase_lower) + r"\b"
+        elif match_type == "regex":
+            # "phrase" to gotowy wzorzec regex (pisany małymi literami — dopasowywany do
+            # message.lower()), do konceptów wyrażalnych na wiele sposobów (np. "badanie
+            # 4 fazy" / "czterofazowe badanie" / "badanie cztery fazy wykazało...").
+            pattern = phrase
+        else:
+            pattern = re.escape(phrase_lower)
         match = re.search(pattern, msg_lower)
 
         if not match:
             continue
 
-        triggered_phrases.append(phrase)
+        display_phrase = str(trigger.get("label") or phrase)
+        triggered_phrases.append(display_phrase)
         for trait, delta in deltas.items():
             if trait in updated:
                 updated[trait] = updated[trait] + float(delta)
 
-        if numeric_bonus and phrase not in already_bonused:
+        if numeric_bonus and display_phrase not in already_bonused:
             window_start = max(0, match.start() - NUMERIC_BONUS_WINDOW)
             window_end = min(len(message), match.end() + NUMERIC_BONUS_WINDOW)
             if _NUMBER_NEARBY_RE.search(message[window_start:window_end]):
-                newly_bonused_phrases.append(phrase)
+                newly_bonused_phrases.append(display_phrase)
                 bonus_total += numeric_bonus
 
         if trigger_forced_reply and forced_reply is None:
