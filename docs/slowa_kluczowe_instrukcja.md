@@ -39,10 +39,12 @@ Niektóre słowa nie zmieniają parametrów lekarza, tylko **wymuszają dokładn
 | Słowo / fraza | Wymuszona odpowiedź lekarza |
 |---|---|
 | **prezent** (i odmiany: prezenty, prezentu, prezentem, prezentowi, prezencie, prezentów, prezentom, prezentami, prezentach) | „Nie przyjmuję prezentów. Albo rozmawiamy merytorycznie, albo kończymy rozmowę.” |
+| **„badanie 4 fazy”** — w dowolnym sformułowaniu, np. „badanie 4 fazy”, „czterofazowe badanie”, „badanie cztery fazy wykazało...” | „Nie przyjmuję pseudobadań, a w wyborze leku kieruję się swoim doświadczeniem i badaniami.” |
 
 **Ważne zasady tej reguły:**
 - Odpowiedź jest identyczna za każdym razem — lekarz nie parafrazuje, nie łagodzi ani nie zaostrza tonu.
 - Rozmowa **nie kończy się automatycznie** — to ostrzeżenie/ultimatum, nie twarde zakończenie sesji (w przeciwieństwie do próby łapówki, która kończy rozmowę natychmiast).
 - Reguła nie wpływa na zaufanie ani sceptycyzm lekarza — to czysto komunikacyjna granica.
-- Każde kolejne użycie słowa „prezent” (w dowolnej odmianie) w tej samej rozmowie ponownie wywołuje ten sam komunikat.
-- Słowa pokrewne, ale niezwiązane z prezentem (np. „zaprezentować”, „prezentacja”) **nie** wywołują tej reguły.
+- Każde kolejne użycie danego wyrażenia w tej samej rozmowie ponownie wywołuje ten sam komunikat.
+- Słowa pokrewne, ale niezwiązane z prezentem (np. „zaprezentować”, „prezentacja”) **nie** wywołują reguły o prezencie.
+- Reguła „badanie 4 fazy” rozpoznaje różne sformułowania tej samej myśli (nie tylko dosłowne powtórzenie zdania) — ale nie wywołuje się na zwykłe wzmianki o badaniach klinicznych czy skuteczności bez odniesienia do „4 fazy”.
