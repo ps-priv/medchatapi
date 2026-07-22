@@ -3,15 +3,24 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from urllib.parse import quote_plus
 
 from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
-# TODO(Paweł): uzupełnić namiarami do testowej bazy MongoDB.
-MONGO_URI = ""
-MONGO_DB_NAME = ""
+# Baza testowa (mikr.dev) — dane połączenia trzymane w kodzie za zgodą Pawła.
+MONGO_USER = "henryk192"
+MONGO_PASSWORD = "9btJVCXtDi"
+MONGO_HOST = "mongodb.mikr.dev"
+MONGO_PORT = 27017
+MONGO_DB_NAME = "db_henryk192"
 MONGO_COLLECTION = "conversation_summaries"
+
+MONGO_URI = (
+    f"mongodb://{quote_plus(MONGO_USER)}:{quote_plus(MONGO_PASSWORD)}"
+    f"@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB_NAME}?authSource={MONGO_DB_NAME}"
+)
 
 _client: Optional[MongoClient] = None
 
