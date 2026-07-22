@@ -114,8 +114,13 @@ async def start_conversation(
         except _json.JSONDecodeError:
             data = None
         if data:
+            # INFORMAL + non-FAMILIAR jest domyślnie niedozwolone (etykieta polska) —
+            # walidowane wewnątrz SessionConfig; archetyp lekarza może to jawnie dopuścić
+            # przez kontekst walidacji, więc nie duplikujemy tu tej reguły.
             try:
-                session_config = SessionConfig.model_validate(data)
+                session_config = SessionConfig.model_validate(
+                    data, context={"allow_informal_override": _allows_informal}
+                )
             except ValidationError as exc:
                 raise HTTPException(
                     status_code=422,
@@ -124,29 +129,6 @@ async def start_conversation(
                         "errors": exc.errors(),
                     },
                 ) from exc
-
-            # INFORMAL + non-FAMILIAR: domyślnie niedozwolone (etykieta polska),
-            # chyba że archetyp lekarza jawnie dopuszcza komunikację nieformalną od razu.
-            if (
-                session_config.register == CommunicationRegister.INFORMAL
-                and session_config.familiarity != Familiarity.FAMILIAR
-                and not _allows_informal
-            ):
-                raise HTTPException(
-                    status_code=422,
-                    detail={
-                        "message": "Niepoprawna konfiguracja sesji.",
-                        "errors": [
-                            {
-                                "msg": (
-                                    "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
-                                    "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
-                                    "lekarz oczekuje formy 'Pan/Pani'."
-                                )
-                            }
-                        ],
-                    },
-                )
     elif _allows_informal:
         # Brak body + lekarz dopuszcza informal → stosuj domyślną konfigurację "starego znajomego".
         session_config = SessionConfig(

@@ -61,16 +61,13 @@ try:
 except ValueError as e:
     print("✓ Test 5: acquainted + informal -> ValueError (poprawne odrzucenie)")
 
-# Test 6: first_meeting + prior_visits_summary - logiczny konflikt
-try:
-    cfg = SessionConfig(
-        familiarity="first_meeting",
-        prior_visits_summary="Spotykaliśmy się już",
-    )
-    assert False, "Powinno rzucić ValueError"
-except ValueError as e:
-    assert "prior_visits_summary" in str(e)
-    print("✓ Test 6: first_meeting + prior_visits_summary -> ValueError")
+# Test 6: first_meeting + prior_visits_summary - cicho czyszczone (nie błąd; zob. commit 15505d7)
+cfg = SessionConfig(
+    familiarity="first_meeting",
+    prior_visits_summary="Spotykaliśmy się już",
+)
+assert cfg.prior_visits_summary is None
+print("✓ Test 6: first_meeting + prior_visits_summary -> cicho wyczyszczone")
 
 # Test 7: serializacja do dict (do response)
 cfg = SessionConfig(familiarity="familiar", register="informal", warmth="warm")
@@ -89,4 +86,20 @@ try:
 except Exception as e:
     print("✓ Test 8: prior_visits_summary > 500 znaków -> błąd walidacji")
 
-print("\n🎉 Wszystkie 8 testów SessionConfig przeszło.")
+# Test 9: familiar + register pominięty -> domyślnie wyprowadzony jako informal
+# (regresja dla zgłoszonego buga: "przyjazny" ignorował formę grzecznościową)
+cfg = SessionConfig(familiarity="familiar", warmth="warm", rep_name="Paweł")
+assert cfg.register == CommunicationRegister.INFORMAL
+print("✓ Test 9: familiar + register pominięty -> wyprowadzony jako informal")
+
+# Test 10: acquainted + register pominięty -> pozostaje professional (bez zmian)
+cfg = SessionConfig(familiarity="acquainted", warmth="warm")
+assert cfg.register == CommunicationRegister.PROFESSIONAL
+print("✓ Test 10: acquainted + register pominięty -> pozostaje professional")
+
+# Test 11: familiar + jawnie podany register=professional -> wybór klienta ma pierwszeństwo
+cfg = SessionConfig(familiarity="familiar", register="professional")
+assert cfg.register == CommunicationRegister.PROFESSIONAL
+print("✓ Test 11: familiar + jawny register=professional -> nie nadpisany")
+
+print("\n🎉 Wszystkie 11 testów SessionConfig przeszło.")

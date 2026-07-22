@@ -82,9 +82,10 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
         )
 
     agenda_block = ""
-    if doctor_agenda:
-        lines = "\n".join(f"  [{item['kind']}] {item['content']}" for item in doctor_agenda)
-        agenda_block = f"\nTwoje wątki na tę rozmowę (wpleć naturalnie gdy pasuje):\n{lines}"
+    unused_agenda = [item for item in doctor_agenda if not item.get("used")]
+    if unused_agenda:
+        lines = "\n".join(f"  [{item['kind']}] {item['content']}" for item in unused_agenda)
+        agenda_block = f"\nTwoje wątki na tę rozmowę (wpleć naturalnie gdy pasuje, tylko raz):\n{lines}"
 
     section_a = (
         f"=== KIM JESTEŚ ===\n"
@@ -120,16 +121,27 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
         phase_objective = "Zapytaj o szczegóły celu wizyty."
         situation_note = ""
     else:
+        false_claims = claim_check.get("false_claims", [])
         claim_view = {
             "potwierdzone": len(claim_check.get("supported_claims", [])),
-            "fałszywe": len(claim_check.get("false_claims", [])),
+            "fałszywe": len(false_claims),
             "niepotwierdzone": len(claim_check.get("unsupported_claims", [])),
             "pokrycie_krytycznych": f"{coverage_summary.get('covered_critical', 0)}/{coverage_summary.get('total_critical', 0)}",
         }
+        correction_block = ""
+        if false_claims:
+            facts = "\n".join(f"  - {text}" for text in false_claims)
+            correction_block = (
+                "\nRozmówca podał dane SPRZECZNE z faktami o leku poniżej. Popraw go i podaj poprawną "
+                "wartość z tych faktów — zawsze jako zasłyszaną opinię, np. 'Wydaje mi się, że ten lek "
+                "powinien mieć...' albo 'Czytałam, że jednak wartość jest inna i wynosi...':\n"
+                f"{facts}\n"
+            )
         drug_block = (
             f"Wiedza o leku: znasz tylko to co powiedział rozmówca. "
             f"Własną wiedzę cytuj jako zasłyszaną opinię.\n"
             f"Weryfikacja twierdzeń: {json.dumps(claim_view, ensure_ascii=False)}\n"
+            f"{correction_block}"
             f"{_rag_section(state)}"
         )
         phase_objective = PHASE_OBJECTIVES.get(state.get("phase", "opening"), "")
@@ -165,6 +177,16 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
     }
     mode_instruction = turn_mode_instructions.get(turn_mode, turn_mode_instructions["REACT"])
 
+    last_doctor_message = ""
+    for msg in reversed(state.get("messages", [])):
+        if msg.get("role") == "assistant":
+            last_doctor_message = str(msg.get("content", "")).strip()
+            break
+    repetition_note = (
+        f"\nTwoja poprzednia wypowiedź (NIE powtarzaj tych samych zdań ani pytań): \"{last_doctor_message}\""
+        if last_doctor_message else ""
+    )
+
     section_b = (
         f"=== CO ROBISZ W TEJ TURZE ===\n"
         f"{turn_line}\n"
@@ -172,6 +194,7 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
         + (f"{situation_note}\n" if situation_note else "")
         + f"Tryb tury: {turn_mode} — {mode_instruction}\n"
         + f"Dyrektywy:\n{directives_text}"
+        + repetition_note
     )
 
     # ----------------------------------------------------------------
@@ -180,8 +203,10 @@ def _build_system_prompt(state: ConversationState) -> str:  # noqa: C901
 
     if register == "informal":
         form_rule = "Jesteście na 'ty' — nie koryguj formy grzecznościowej."
+    elif message_analysis.get("gender_mismatch_hits"):
+        form_rule = f"Rozmówca użył niepoprawnej formy w TEJ wypowiedzi — popraw go: '{message_analysis.get('expected_address', 'pani/pan doktor')}'."
     else:
-        form_rule = f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj błędy grzecznościowe."
+        form_rule = f"Forma: '{message_analysis.get('expected_address', 'pani/pan doktor')}'. Koryguj tylko jeśli rozmówca faktycznie się pomyli — nie przypominaj bez powodu."
 
     if conviction:
         tr = float(conviction.get("trust_in_rep", 0.3))

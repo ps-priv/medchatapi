@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -44,9 +44,13 @@ class SessionConfig(BaseModel):
         default=Familiarity.FIRST_MEETING,
         description="Poziom znajomości lekarza z przedstawicielem przed rozmową.",
     )
-    register: CommunicationRegister = Field(
-        default=CommunicationRegister.PROFESSIONAL,
-        description="Formalność komunikacji. INFORMAL dopuszczalny tylko z FAMILIAR.",
+    register: Optional[CommunicationRegister] = Field(
+        default=None,
+        description=(
+            "Formalność komunikacji. Jeśli pominięte, wyprowadzana z familiarity "
+            "(familiar => informal, w przeciwnym razie professional). "
+            "INFORMAL dopuszczalny tylko z FAMILIAR."
+        ),
     )
     warmth: CommunicationWarmth = Field(
         default=CommunicationWarmth.NEUTRAL,
@@ -70,7 +74,31 @@ class SessionConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_consistency(self) -> "SessionConfig":
+    def validate_consistency(self, info: ValidationInfo) -> "SessionConfig":
+        # register niepodany przez klienta → wyprowadzamy z familiarity, żeby "przyjazny"
+        # nie kończył się mimo wszystko wymuszaniem formy "Pan/Pani Doktor"
+        if self.register is None:
+            self.register = (
+                CommunicationRegister.INFORMAL
+                if self.familiarity == Familiarity.FAMILIAR
+                else CommunicationRegister.PROFESSIONAL
+            )
+
+        # INFORMAL wymaga FAMILIAR — chyba że wywołujący jawnie przekaże w kontekście
+        # walidacji zgodę archetypu lekarza (np. session_config.register.allows_informal
+        # sprawdzane w api7.py na podstawie profilu lekarza).
+        context = info.context or {}
+        if (
+            self.register == CommunicationRegister.INFORMAL
+            and self.familiarity != Familiarity.FAMILIAR
+            and not context.get("allow_informal_override", False)
+        ):
+            raise ValueError(
+                "Komunikacja nieformalna (na 'ty') jest możliwa tylko gdy "
+                "familiarity = 'familiar'. Przy pierwszym lub okazjonalnym kontakcie "
+                "lekarz oczekuje formy 'Pan/Pani'."
+            )
+
         # przy first_meeting lekarz nie pamięta poprzednich wizyt — cicho czyścimy summary
         if self.prior_visits_summary and self.familiarity == Familiarity.FIRST_MEETING:
             self.prior_visits_summary = None

@@ -58,6 +58,7 @@ print(f"Sesja: {session_id}\n")
 # --- TURY ---
 conviction_start = None
 last_resp = None
+dosage_turn_resp = None  # tura 4: błędne dawkowanie (5-80 mg) — poprawne to 20 mg
 terminated_early = False
 
 for i, msg in enumerate(TURNS, 1):
@@ -77,6 +78,8 @@ for i, msg in enumerate(TURNS, 1):
 
     if i == 1 and resp.get("conviction"):
         conviction_start = dict(resp["conviction"])
+    if i == 4:
+        dosage_turn_resp = resp
     last_resp = resp
 
     if resp.get("is_terminated"):
@@ -125,6 +128,19 @@ if last_resp:
         cc < 0.60,
         f"clinical_confidence nie skoczyło wysoko przy odrzuconych claimach (jest: {cc:.2f})"
     ))
+
+# Walor edukacyjny: przy błędnym dawkowaniu (5-80 mg) lekarz powinien podać
+# poprawną wartość z bazy (noacid_dosage: "20 mg raz na dobę"), np. "wydaje mi się,
+# że..." / "czytałam, że jednak wartość to..." — patrz prompt_builder.py correction_block
+if dosage_turn_resp:
+    dosage_msg = dosage_turn_resp.get("doctor_message", "").lower()
+    passes.append(assert_pass(
+        "20 mg" in dosage_msg or "20mg" in dosage_msg,
+        f"Lekarz podaje poprawne dawkowanie (20 mg) po błędnym claimie "
+        f"(wiadomość: {dosage_turn_resp.get('doctor_message', '')[:200]!r})"
+    ))
+else:
+    passes.append(assert_pass(False, "Brak odpowiedzi lekarza dla tury z błędnym dawkowaniem"))
 
 if "error" not in fin:
     ev = fin.get("evaluation", {})
